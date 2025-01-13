@@ -1,0 +1,36 @@
+
+<launch>
+	<node pkg="nodelet" type="nodelet" args="manager" name="perception_nodelet_manager" output="screen"/>
+
+	<!-- Rectify Depth Camera and disable unused topics to reduce traffic -->
+	<node pkg="nodelet" type="nodelet" name="rectifier_depth"
+        args="load image_proc/rectify perception_nodelet_manager" output="screen">
+		<rosparam param="/realsense/depth/image_rect/disable_pub_plugins">[image_transport/compressed, image_transport/compressedDepth, image_transport/theora]</rosparam>
+		<remap from="camera_info" to="/realsense/depth/camera_info"/>
+		<remap from="image_mono" to="/realsense/depth/image"/>
+		<remap from="image_rect" to="/realsense/depth/image_rect"/>
+	</node>
+
+	<!-- Convert Depth Camera to Point Cloud -->
+	<node pkg="nodelet" type="nodelet" name="cloud_converter"
+        args="load depth_image_proc/point_cloud_xyz perception_nodelet_manager" output="screen">
+		<remap from="camera_info" to="/realsense/depth/camera_info"/>
+		<remap from="image_rect" to="/realsense/depth/image_rect"/>
+		<remap from="points" to="/realsense/depth/point_cloud"/>
+	</node>
+
+	<!-- Provide correct TF for Depth Camera -->
+	<node pkg="tf2_ros" type="static_transform_publisher"
+        name="ros_to_realsense_depth_camera" args="0 0 0 -1.570795 0 -1.570795 /Quadrotor/DepthCamera /Quadrotor/Sensors/DepthCamera" />
+
+	<!-- Transform Depth Camera to Octomap, which is published on two topics: -->
+	<!-- /octomap_binary only distinguishes between free and occupied space -->
+	<!-- /octomap_full contains the complete probabilities and all additional data stored in the tree -->
+	<node pkg="octomap_server" type="octomap_server_node" name="octomap_server" output="screen">
+		<remap from="cloud_in" to="/realsense/depth/point_cloud"/>
+		<param name="frame_id" type="string" value="world" />
+		<param name="resolution" type="double" value="0.5" />
+		<param name="sensor_model/max_range" value="35.0" />
+	</node>
+
+</launch>
