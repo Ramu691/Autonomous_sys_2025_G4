@@ -1,1 +1,1 @@
-pleas ebuild it with COLCON BUILD
+pleas ebuild it with CATKIN BUILD
