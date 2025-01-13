@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
+cmake_policy(SET CMP0048 NEW)
 project(controller_pkg)
 
 include(CheckCXXCompilerFlag)
@@ -42,3 +43,7 @@ target_link_libraries(controller_node ${catkin_LIBRARIES})
 add_executable(traj_publisher src/traj_publisher.cpp)
 add_dependencies(traj_publisher ${catkin_EXPORTED_TARGETS})
 target_link_libraries(traj_publisher ${catkin_LIBRARIES})
+
+add_executable(nav_to_cave_entrance src/nav_to_cave_entrance.cpp)
+add_dependencies(nav_to_cave_entrance ${catkin_EXPORTED_TARGETS})
+target_link_libraries(nav_to_cave_entrance ${catkin_LIBRARIES})

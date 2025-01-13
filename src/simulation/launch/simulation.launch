@@ -41,7 +41,8 @@
   <node name="w_to_unity" pkg="simulation" type="w_to_unity"/>
   
   <node name="controller_node" pkg="controller_pkg" type="controller_node"/>
-  
+
+  <node name="nav_to_cave_entrance" pkg="controller_pkg" type="nav_to_cave_entrance"/>  
 
 
 
