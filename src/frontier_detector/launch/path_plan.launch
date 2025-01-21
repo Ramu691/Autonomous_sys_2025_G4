@@ -1,0 +1,8 @@
+<launch>
+    <node 
+        pkg = "path_plan"
+        type = "path_plan_node"
+        name = "path_plan_node"
+        output="screen"
+    />
+</launch>
