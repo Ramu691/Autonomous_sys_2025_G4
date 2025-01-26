@@ -10,6 +10,8 @@
 #include <ompl/geometric/planners/rrt/RRT.h>
 #include <ompl/base/ScopedState.h>
 #include <std_msgs/String.h>
+#include <custom_msgs/FrontierGoalMsg.h>
+#include <geometry_msgs/Point.h>
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -22,7 +24,8 @@ private:
     ros::Publisher path_pub_;
 
     octomap::OcTree *map_; // Octomap for obstacle detection
-    geometry_msgs::PoseStamped start_pose_, goal_pose_;
+    geometry_msgs::PoseStamped start_pose_;
+    custom_msgs::FrontierGoalMsg goal_pose_;
     bool start_received_, goal_received_, octomap_received_;
     std::string stm_state_="Explore Cave";
 
@@ -34,7 +37,8 @@ public:
     {
         // Subscribers
         start_pose_sub_ = nh_.subscribe("/pose_est", 1, &OMPLPathPlanner::startPoseCallback, this);
-        goal_pose_sub_ = nh_.subscribe("/goal", 1, &OMPLPathPlanner::goalPoseCallback, this);
+        //goal_pose_sub_ = nh_.subscribe("/", 1, &OMPLPathPlanner::goalPoseCallback, this);
+        goal_pose_sub_ = nh_.subscribe("/frontier_goal", 1, &OMPLPathPlanner::goalPoseCallback, this);
         octomap_sub_ = nh_.subscribe("octomap_binary", 1, &OMPLPathPlanner::octomapCallback, this);
         //state_sub_ = nh_.subscribe("/Current_State_stm", 1, &OMPLPathPlanner::stateCallback, this);
 
@@ -66,9 +70,16 @@ public:
     }
 
     // Callback to receive the goal pose
-    void goalPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
+    // void goalPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
+    // {
+    //     goal_pose_ = *msg;
+    //     goal_received_ = true;
+    //     ROS_INFO("Received goal pose.");
+    //     attemptPlanning();
+    // }
+    void goalPoseCallback(const custom_msgs::FrontierGoalMsg::ConstPtr &frontiergoal)
     {
-        goal_pose_ = *msg;
+        goal_pose_ = *frontiergoal;
         goal_received_ = true;
         ROS_INFO("Received goal pose.");
         attemptPlanning();
@@ -152,9 +163,9 @@ public:
         start->as<ob::RealVectorStateSpace::StateType>()->values[2] = start_pose_.pose.position.z;
 
         ob::ScopedState<> goal(space);
-        goal->as<ob::RealVectorStateSpace::StateType>()->values[0] = goal_pose_.pose.position.x;
-        goal->as<ob::RealVectorStateSpace::StateType>()->values[1] = goal_pose_.pose.position.y;
-        goal->as<ob::RealVectorStateSpace::StateType>()->values[2] = goal_pose_.pose.position.z;
+        goal->as<ob::RealVectorStateSpace::StateType>()->values[0] = goal_pose_.point.x;
+        goal->as<ob::RealVectorStateSpace::StateType>()->values[1] = goal_pose_.point.y;
+        goal->as<ob::RealVectorStateSpace::StateType>()->values[2] = goal_pose_.point.z;
 
         ss.setStartAndGoalStates(start, goal);
 
