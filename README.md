@@ -9,6 +9,9 @@
     ```bash
     sudo apt-get install ros-noetic-octomap-ros ros-noetic-octomap-server ros-noetic-octomap-rviz-plugins python3-catkin-tools git
     ```
+    ```bash
+    sudo apt-get install ros-noetic-ompl
+    ```
 4. Set up your SSH keys set up for Github. If you don't have them set up, follow these instructions:
     * To create an SSH
       keypair: https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
