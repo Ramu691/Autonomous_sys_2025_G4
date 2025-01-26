@@ -153,7 +153,7 @@ public:
 		        if (distanceToOriginal > convergenceThreshold) {
 		            shiftedPoints[i] = shiftVector;
 		            converged = false;
-					ROS_WARN("didnot converged !!!!!!!!!!!!!!!!");
+					//ROS_WARN("didnot converged !!!!!!!!!!!!!!!!");
 		        }
 		    }
 		}

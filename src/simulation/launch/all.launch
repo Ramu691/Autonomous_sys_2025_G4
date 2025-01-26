@@ -1,7 +1,0 @@
-<launch>
-  <include file="$(find simulation)/launch/simulation.launch" />
-  <include file="$(find perception_pkg)/launch/perception.launch" />
-  <!-- Comment in the following line to show visualization in rviz -->
-  <!-- Make sure to install the following plugin before: "sudo apt-get install ros-noetic-octomap-rviz-plugins" -->
-  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find simulation)/cfg/config.rviz" /> -->
-</launch>
