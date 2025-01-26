@@ -1,0 +1,9 @@
+<launch>
+  <include file="$(find simulation)/launch/simulation.launch" />
+  <include file="$(find perception_pkg)/launch/perception.launch" />
+  <node pkg="frontier_detector" type="frontier_detection" name="frontier_detector"/>
+  <node pkg="rrt_planner" type="rrt_planner_node" name="rrt_planner_node"/>
+  <!-- Comment in the following line to show visualization in rviz -->
+  <!-- Make sure to install the following plugin before: "sudo apt-get install ros-noetic-octomap-rviz-plugins" -->
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find simulation)/cfg/new_config.rviz" /> -->
+</launch>
