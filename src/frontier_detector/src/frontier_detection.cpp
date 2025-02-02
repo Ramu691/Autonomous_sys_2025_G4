@@ -82,7 +82,7 @@ public:
 		mat.getRPY(roll, pitch, drone_yaw);
 
 		// Check if drone has reached the cave entry point
-        if (abs(curr_drone_position.x - cave_entry_point.x) < 1.0 && abs(curr_drone_position.y - cave_entry_point.y) < 1.0 && abs(curr_drone_position.z - cave_entry_point.z) < 1.0 && abs(drone_yaw - 3.14) < 0.1) {
+        if (abs(curr_drone_position.x - cave_entry_point.x) < 3.0 && abs(curr_drone_position.y - cave_entry_point.y) < 3.0 && abs(curr_drone_position.z - cave_entry_point.z) < 3.0 && abs(drone_yaw - 3.14) < 0.1) {
             if (statemachine_state != "Explore Cave") {
                 ROS_INFO("Reached cave entry. Starting cave exploration.");
                 ros::param::set("/Current_State", "Explore Cave");

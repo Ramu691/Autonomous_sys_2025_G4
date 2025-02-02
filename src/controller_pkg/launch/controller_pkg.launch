@@ -1,0 +1,5 @@
+<launch>
+   <rosparam command="load" file="$(find controller_pkg)/params/controller_pkg.yaml" />
+   <node name="controller_node" pkg="controller_pkg" type="controller_node" output="screen"/>
+   <node name="nav_to_cave_entrance_node" pkg="controller_pkg" type="nav_to_cave_entrance_node" output="screen"/>
+</launch>

@@ -39,12 +39,6 @@
   </node>
 
   <node name="w_to_unity" pkg="simulation" type="w_to_unity"/>
-  
-  <node name="controller_node" pkg="controller_pkg" type="controller_node"/>
-
-  <node name="nav_to_cave_entrance" pkg="controller_pkg" type="nav_to_cave_entrance"/>  
-
-
 
   <node pkg="tf2_ros" type="static_transform_publisher"
         name="sim_true_body"      args="0 0 0 0 0 0 /Quadrotor/TrueState /true_body" />

@@ -7,7 +7,8 @@
 
 #include <math.h>
 
-#define NUM_WP 3 
+#define NUM_WP 1
+
 class Position{
     public:
         double x_position, y_position, z_position, heading;
@@ -22,58 +23,52 @@ class Position{
 class UAVController{
     ros::NodeHandle nh;
     ros::Subscriber state_subscriber;
-    ros::Publisher des_state_publisher;
+    ros::Publisher des_state_publisher, goal_publisher;
     double current_x, current_y, current_z;
     double initial_x, initial_y, initial_z;
     double delta_x, delta_y, delta_z;
+    double acceptance_radius, gain;
     
-    Position waypoints[NUM_WP] = {Position(-90.0, 10.0, 25.0, 3.14),
-                                  Position(-200.0, 15.0, 20.0, 3.14),
-                                  Position(-321.0, 10.0, 15.0, 3.14)};  
+    Position waypoints[NUM_WP] = {Position(-324.0, 10.0, 16.0, 3.14)};  
 
     int waypoint_index = 0;
-    double time_start = ros::Time::now().toSec();
+    double time_start = -1;
     
     public:
         UAVController(){
             state_subscriber = nh.subscribe("/pose_est", 1, &UAVController::stateCallback, this);
-            des_state_publisher = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("desired_state", 1);  
+            des_state_publisher = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("desired_state", 1);
+            nh.param<double>("acceptance_radius", acceptance_radius, 3);
+            nh.param<double>("gain", gain, 0.05);
         }
         
         double calculate_error(double desired_pose, double actual_pose){
-            double gain = 0.1; 
             return gain * (desired_pose - actual_pose);
         }
                 
-        void stateCallback(const geometry_msgs::PoseStamped& current_pose){      
+        void stateCallback(const geometry_msgs::PoseStamped& current_pose){   
+            // Set time_start as soon as first stateCallback arrives   
+            if(time_start == -1){
+                time_start = ros::Time::now().toSec();
+            }
             current_x = current_pose.pose.position.x;
             current_y = current_pose.pose.position.y;
             current_z = current_pose.pose.position.z;
             
-            if(waypoint_index == 0){
-                initial_x = current_x;
-                initial_y = current_y;
-                initial_z = current_z;
-                
-                delta_x = calculate_error(waypoints[waypoint_index].x_position, current_x);
-                delta_y = calculate_error(waypoints[waypoint_index].y_position, current_y);
-                delta_z = calculate_error(waypoints[waypoint_index].z_position, current_z);
-            }
-            
             if(sqrt(pow(current_x - waypoints[waypoint_index].x_position, 2) + 
                     pow(current_y - waypoints[waypoint_index].y_position, 2) + 
-                    pow(current_z - waypoints[waypoint_index].z_position, 2)) < 1){  
+                    pow(current_z - waypoints[waypoint_index].z_position, 2)) < acceptance_radius){  
                 waypoint_index++;
                 time_start = ros::Time::now().toSec();
-                
-                initial_x = current_x;
-                initial_y = current_y;
-                initial_z = current_z;
-                
-                delta_x = calculate_error(waypoints[waypoint_index].x_position, current_x);
-                delta_y = calculate_error(waypoints[waypoint_index].y_position, current_y);
-                delta_z = calculate_error(waypoints[waypoint_index].z_position, current_z);
             }
+
+            initial_x = current_x;
+            initial_y = current_y;
+            initial_z = current_z;
+            
+            delta_x = calculate_error(waypoints[waypoint_index].x_position, current_x);
+            delta_y = calculate_error(waypoints[waypoint_index].y_position, current_y);
+            delta_z = calculate_error(waypoints[waypoint_index].z_position, current_z);
             
             if(waypoint_index < NUM_WP){
                 double time_elapsed = ros::Time::now().toSec() - time_start;        
