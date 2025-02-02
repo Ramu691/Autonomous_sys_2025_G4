@@ -152,14 +152,10 @@ public:
       // Controller gains
       //
 
-      kx = 12.7;
-      kv = 5.8;
-      kr = 8.8;
-      komega = 1.15;
-//      kx = 10;
-//      kv = 5;
-//      kr = 11;
-//      komega = 1;
+      nh.param<double>("kx", kx, 12.7);
+      nh.param<double>("kv", kv, 5.8);
+      nh.param<double>("kr", kr, 8.8);
+      nh.param<double>("komega", komega, 1.15);
 
       // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
       //                                 end part 6

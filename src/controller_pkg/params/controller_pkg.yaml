@@ -1,0 +1,8 @@
+# Controller
+kx: 12.7              # [No unit], tuning for controller
+kv: 5.8               # [No unit], tuning for controller
+kr: 8.8               # [No unit], tuning for controller
+komega: 1.15          # [No unit], tuning for controller
+# Nav_to_cave
+acceptance_radius: 3  # [m], acceptance_radius, for when waypoint counts as reached
+gain: 0.01            # [No unit], tuning for nav_to_cave

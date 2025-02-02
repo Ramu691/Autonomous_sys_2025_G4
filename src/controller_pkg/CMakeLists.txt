@@ -33,17 +33,12 @@ catkin_package(CATKIN_DEPENDS
 )
 
 find_package(Eigen3)
-
 include_directories(${catkin_INCLUDE_DIRS})
+
 add_executable(controller_node src/controller_node.cpp)
 add_dependencies(controller_node ${catkin_EXPORTED_TARGETS})
-
 target_link_libraries(controller_node ${catkin_LIBRARIES})
 
-add_executable(traj_publisher src/traj_publisher.cpp)
-add_dependencies(traj_publisher ${catkin_EXPORTED_TARGETS})
-target_link_libraries(traj_publisher ${catkin_LIBRARIES})
-
-add_executable(nav_to_cave_entrance src/nav_to_cave_entrance.cpp)
-add_dependencies(nav_to_cave_entrance ${catkin_EXPORTED_TARGETS})
-target_link_libraries(nav_to_cave_entrance ${catkin_LIBRARIES})
+add_executable(nav_to_cave_entrance_node src/nav_to_cave_entrance_node.cpp)
+add_dependencies(nav_to_cave_entrance_node ${catkin_EXPORTED_TARGETS})
+target_link_libraries(nav_to_cave_entrance_node ${catkin_LIBRARIES})
