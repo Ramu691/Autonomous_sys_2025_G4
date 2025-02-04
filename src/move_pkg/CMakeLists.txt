@@ -15,7 +15,6 @@ find_package(catkin REQUIRED COMPONENTS
 ## Find additional libraries
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Curses REQUIRED)
 
 ## Declare a catkin package
 
@@ -29,7 +28,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
-  ${CURSES_INCLUDE_DIRS}
 )
 
 ## Add executables
@@ -39,7 +37,6 @@ add_executable(lantern_detector src/lantern_detector.cpp)
 ## Link libraries for move_straight
 target_link_libraries(move_straight
   ${catkin_LIBRARIES}
-  ${CURSES_LIBRARIES}
 )
 
 ## Link libraries for lantern_detector

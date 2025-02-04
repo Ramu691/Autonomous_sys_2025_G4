@@ -4,6 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /OccupancyGrid1
         - /DepthCloud1/Auto Size1
       Splitter Ratio: 0.5029411911964417
     Tree Height: 627
@@ -36,7 +37,7 @@ Visualization Manager:
       Enabled: true
       Max. Height Display: 40
       Max. Octree Depth: 16
-      Min. Height Display: -30
+      Min. Height Display: -200
       Name: OccupancyGrid
       Octomap Topic: /octomap_binary
       Queue Size: 5
