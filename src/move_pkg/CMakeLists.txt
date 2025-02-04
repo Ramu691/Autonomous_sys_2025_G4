@@ -31,13 +31,7 @@ include_directories(
 )
 
 ## Add executables
-add_executable(move_straight src/move_straight.cpp)
 add_executable(lantern_detector src/lantern_detector.cpp)
-
-## Link libraries for move_straight
-target_link_libraries(move_straight
-  ${catkin_LIBRARIES}
-)
 
 ## Link libraries for lantern_detector
 target_link_libraries(lantern_detector
@@ -47,6 +41,6 @@ target_link_libraries(lantern_detector
 )
 
 ## Install targets
-install(TARGETS move_straight lantern_detector
+install(TARGETS lantern_detector
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
