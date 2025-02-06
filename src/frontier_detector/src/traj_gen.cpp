@@ -157,7 +157,7 @@ private:
         double dist = std::sqrt(dx*dx + dy*dy + dz*dz);
 
         // Lower the minimum time so short distances go faster
-        T_ = std::max(1.0, dist * 0.3);
+        T_ = std::max(1.0, dist * 0.2);
 
         // Compute polynomials along x, y, z
         cx_ = computeSegmentCoeffs(startP.x, endP.x, T_);
