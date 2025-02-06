@@ -1,8 +1,10 @@
 /****************************************************
- *  traj_gen.cpp (Single segment: first pose to last pose)
+ *  traj_gen_with_path.cpp
  *  
- *  Subscribes: /rrt_path (nav_msgs::Path)
- *  Publishes:  /trajectory (MultiDOFJointTrajectoryPoint)
+ *  - Single segment from first pose to last pose in /rrt_path
+ *  - Publishes both:
+ *      (a) /trajectory (MultiDOFJointTrajectoryPoint) at 20 Hz
+ *      (b) /trajectory_path (nav_msgs::Path) once
  ****************************************************/
 
 #include <ros/ros.h>
@@ -55,6 +57,7 @@ Eigen::VectorXd computeSegmentCoeffs(double p0, double pT, double T)
     }
     b(7) = 0.0;
 
+    // Solve
     return A.colPivHouseholderQr().solve(b);
 }
 
@@ -67,6 +70,7 @@ double evalPoly(const Eigen::VectorXd &coeffs, double t, int derivative_order)
     double val = 0.0;
     for(int i = derivative_order; i < 8; i++){
         double factor = 1.0;
+        // multiply out the factorial terms for derivative
         for(int k = 0; k < derivative_order; k++){
             factor *= (i - k);
         }
@@ -81,9 +85,17 @@ public:
     TrajGen()
       : nh_("~"), publish_rate_(20.0), has_coeffs_(false)
     {
+        // Subscribes to RRT path
         path_sub_ = nh_.subscribe("/rrt_path", 1, &TrajGen::pathCallback, this);
+
+        // Publishes single trajectory point
         traj_pub_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/trajectory", 10);
 
+        // Publishes the entire path (for RViz)
+        // Latching so that RViz can see the path even if it connects late
+        path_pub_ = nh_.advertise<nav_msgs::Path>("/trajectory_path", 1, true);
+
+        // Timer to publish at 20 Hz
         timer_ = nh_.createTimer(
             ros::Duration(1.0/publish_rate_),
             &TrajGen::timerCallback,
@@ -97,6 +109,7 @@ private:
     ros::NodeHandle nh_;
     ros::Subscriber path_sub_;
     ros::Publisher  traj_pub_;
+    ros::Publisher  path_pub_;
     ros::Timer      timer_;
 
     double publish_rate_;
@@ -111,7 +124,6 @@ private:
 
     /**
      * @brief Subscribes to /rrt_path, uses only first & last poses for a single segment
-     *        BUT ignores new path messages while still executing a trajectory.
      */
     void pathCallback(const nav_msgs::Path &path_msg)
     {
@@ -156,6 +168,9 @@ private:
         start_time_ = ros::Time::now();
 
         ROS_INFO("TrajGen: Built single polynomial. dist=%.2f, T=%.2f", dist, T_);
+
+        // Now publish the entire path for visualization
+        publishFullPolynomialPath();
     }
 
     /**
@@ -236,6 +251,48 @@ private:
             "TrajGen: t=%.2f -> pos(%.2f,%.2f,%.2f) vel(%.2f,%.2f,%.2f), yaw=%.2f deg",
             t, px, py, pz, vx, vy, vz, heading * 180.0 / M_PI
         );
+    }
+
+    /**
+     * @brief Build a nav_msgs::Path from t=0..T_ in small steps (e.g., 50)
+     *        and publish it so we can see the entire polynomial in RViz.
+     */
+    void publishFullPolynomialPath()
+    {
+        nav_msgs::Path path_vis;
+        path_vis.header.stamp = ros::Time::now();
+        path_vis.header.frame_id = "world";
+
+        const int STEPS = 50; // how many samples in [0..T_]
+        for(int i=0; i<=STEPS; i++){
+            double sample_t = (double)i / (double)STEPS * T_;
+
+            double px = evalPoly(cx_, sample_t, 0);
+            double py = evalPoly(cy_, sample_t, 0);
+            double pz = evalPoly(cz_, sample_t, 0);
+
+            double vx = evalPoly(cx_, sample_t, 1);
+            double vy = evalPoly(cy_, sample_t, 1);
+
+            // Yaw from velocity
+            double heading = std::atan2(vy, vx);
+
+            geometry_msgs::PoseStamped ps;
+            ps.header = path_vis.header;
+            ps.pose.position.x = px;
+            ps.pose.position.y = py;
+            ps.pose.position.z = pz;
+
+            // Orientation
+            tf2::Quaternion q;
+            q.setRPY(0.0, 0.0, heading);
+            ps.pose.orientation = tf2::toMsg(q);
+
+            path_vis.poses.push_back(ps);
+        }
+
+        path_pub_.publish(path_vis);
+        ROS_INFO("TrajGen: Published single-segment polynomial path with %d samples", (int)path_vis.poses.size());
     }
 };
 
