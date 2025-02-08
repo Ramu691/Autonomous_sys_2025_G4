@@ -1,0 +1,4 @@
+# RRT Tuning
+step_size_factor: 2
+bias: 0.05
+timeout: 3    # [sec]

@@ -1,0 +1,4 @@
+<launch>
+   <rosparam command="load" file="$(find rrt_planner)/params/rrt_planner.yaml" />
+   <node pkg="rrt_planner" type="rrt_planner_node" name="rrt_planner_node"/>
+</launch>

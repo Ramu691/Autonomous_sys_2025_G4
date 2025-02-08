@@ -152,10 +152,10 @@ public:
       // Controller gains
       //
 
-      nh.param<double>("kx", kx, 12.7);
-      nh.param<double>("kv", kv, 5.8);
-      nh.param<double>("kr", kr, 8.8);
-      nh.param<double>("komega", komega, 1.15);
+    if (!ros::param::get("kx", kx)) ROS_FATAL("Required parameter kx was not found on parameter server");
+    if (!ros::param::get("kv", kv)) ROS_FATAL("Required parameter kv was not found on parameter server");
+    if (!ros::param::get("kr", kr)) ROS_FATAL("Required parameter kr was not found on parameter server");
+    if (!ros::param::get("komega", komega)) ROS_FATAL("Required parameter komega was not found on parameter server");
 
       // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
       //                                 end part 6

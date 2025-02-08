@@ -10,6 +10,7 @@
 #include <ompl/base/ScopedState.h>
 #include <std_msgs/String.h>
 #include <custom_msgs/FrontierGoalMsg.h>
+#include <custom_msgs/CheckPath.h>
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -20,6 +21,7 @@ private:
     ros::NodeHandle nh_;
     ros::Subscriber start_pose_sub_, goal_pose_sub_, octomap_sub_;
     ros::Publisher path_pub_;
+    ros::ServiceServer check_path_;
 
     octomap::OcTree *map_;
     geometry_msgs::PoseStamped start_pose_;
@@ -28,16 +30,23 @@ private:
     std::string stm_state_ = "Explore Cave";
 
     double map_resolution_;
-    double step_size_;
-    std::vector<geometry_msgs::PoseStamped> computed_path_;
+    double step_size_factor_; // Step size factor
+    double bias_; // Bias for the planner
+    double timeout_; 
 
 public:
-    OMPLPathPlanner() : map_(nullptr), start_received_(false), goal_received_(false), octomap_received_(false), step_size_(1.0)
+    OMPLPathPlanner() : map_(nullptr), start_received_(false), goal_received_(false), octomap_received_(false)
     {
         start_pose_sub_ = nh_.subscribe("/pose_est", 1, &OMPLPathPlanner::startPoseCallback, this);
         goal_pose_sub_ = nh_.subscribe("/frontier_goal", 1, &OMPLPathPlanner::goalPoseCallback, this);
         octomap_sub_ = nh_.subscribe("octomap_binary", 1, &OMPLPathPlanner::octomapCallback, this);
         path_pub_ = nh_.advertise<nav_msgs::Path>("rrt_path", 1);
+
+        check_path_ = nh_.advertiseService("check_path", &OMPLPathPlanner::handleCheckPath, this);
+
+        if (!ros::param::get("step_size_factor", step_size_factor_)) ROS_FATAL("Required parameter step_size_factor was not found on parameter server");
+        if (!ros::param::get("bias", bias_)) ROS_FATAL("Required parameter bias was not found on parameter server");
+        if (!ros::param::get("timeout", timeout_)) ROS_FATAL("Required parameter timeout was not found on parameter server");
         ROS_INFO("OMPL Path Planner initialized.");
     }
 
@@ -45,6 +54,18 @@ public:
     {
         if (map_)
             delete map_;
+    }
+
+    bool handleCheckPath(custom_msgs::CheckPath::Request &req,
+                        custom_msgs::CheckPath::Response &res) {
+        // save original goal
+        custom_msgs::FrontierGoalMsg real_goal = goal_pose_;
+        goal_pose_ = req.goal_pos;
+        goal_received_ = true;
+        res.pathFound = planPath(true);
+        // restore original goal
+        goal_pose_ = real_goal;;
+        return true;
     }
 
     void startPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
@@ -94,43 +115,20 @@ public:
         return node == nullptr || node->getOccupancy() <= 0.5;
     }
 
-    bool isFrontierReachable()
-    {
-        if (!map_)
-            return false;
-
-        octomap::point3d drone_pos(start_pose_.pose.position.x, start_pose_.pose.position.y, start_pose_.pose.position.z);
-        octomap::point3d goal_pos(goal_pose_.point.x, goal_pose_.point.y, goal_pose_.point.z);
-        octomap::point3d hit;
-
-        double distance = computeDistance(start_pose_.pose.position, goal_pose_.point);
-        return !map_->castRay(drone_pos, goal_pos - drone_pos, hit, true, distance);
-    }
-
     void attemptPlanning()
     {
         if (start_received_ && goal_received_ && octomap_received_ && stm_state_ == "Explore Cave")
         {
             ROS_INFO("Attempting to plan a path...");
-            
-            ros::Time start_time = ros::Time::now();
-            while ((ros::Time::now() - start_time).toSec() < 5.0)
-            {
-                if (isFrontierReachable())
-                {
-                    planPath();
-                    return;
-                }
-                ROS_WARN_THROTTLE(1.0, "Waiting for frontier to become reachable...");
-                ros::Duration(0.5).sleep();
-            }
-
-            //ROS_WARN("Frontier is still not reachable after 5 seconds. Reversing path...");
-            //reversePath();
+            planPath();
         }
     }
 
-    void planPath()
+    bool planPath(){
+        return planPath(false);
+    }
+
+    bool planPath(bool onlyCheck)
     {
         auto space = std::make_shared<ob::RealVectorStateSpace>(3);
         ob::RealVectorBounds bounds(3);
@@ -146,6 +144,20 @@ public:
         bounds.setHigh(2, z_max);
         space->setBounds(bounds);
 
+        if (start_pose_.pose.position.x < x_min || start_pose_.pose.position.x > x_max ||
+            start_pose_.pose.position.y < y_min || start_pose_.pose.position.y > y_max ||
+            start_pose_.pose.position.z < z_min || start_pose_.pose.position.z > z_max ) {
+            ROS_ERROR("Start position is out of bounds!");
+            return false;
+        }
+
+        if (goal_pose_.point.x < x_min || goal_pose_.point.x > x_max ||
+            goal_pose_.point.y < y_min || goal_pose_.point.y > y_max ||
+            goal_pose_.point.z < z_min || goal_pose_.point.z > z_max ) {
+            ROS_ERROR("Goal position is out of bounds!");
+            return false;
+        }
+
         og::SimpleSetup ss(space);
         ss.setStateValidityChecker([this](const ob::State *state) { return isStateValid(state); });
 
@@ -160,14 +172,21 @@ public:
 
         ss.setStartAndGoalStates(start, goal);
         auto planner = std::make_shared<og::RRT>(ss.getSpaceInformation());
+        planner->setRange(step_size_factor_ * map_resolution_);
+        planner->setGoalBias(bias_);
         ss.setPlanner(planner);
-        ob::PlannerStatus solved = ss.solve(3.0);
+
+        // Solve the planning problem
+        ob::PlannerStatus solved = ss.solve(timeout_);
+
+        if(onlyCheck){
+            return solved;
+        }
 
         if (solved)
         {
             ROS_INFO("Path found!");
-            ss.simplifySolution();
-            //computed_path_.clear();
+            // ss.simplifySolution();
 
             og::PathGeometric path = ss.getSolutionPath();
             nav_msgs::Path ros_path;
@@ -180,7 +199,19 @@ public:
                 pose.pose.position.x = s->values[0];
                 pose.pose.position.y = s->values[1];
                 pose.pose.position.z = s->values[2];
-                computed_path_.push_back(pose);
+
+                // check again with raytracing as aditional robustnes
+                if(!ros_path.poses.empty()){                    
+                    octomap::point3d p1(ros_path.poses[-1].pose.position.x, ros_path.poses[-1].pose.position.y, ros_path.poses[-1].pose.position.z);
+                    octomap::point3d p2(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+                    octomap::point3d hit;
+                    double distance = computeDistance(ros_path.poses[-1].pose.position, pose.pose.position);
+                    if(map_->castRay(p1, p2 - p1, hit, true, distance)){
+                        // not successfull
+                        return false;
+                    }
+                }
+
                 ros_path.poses.push_back(pose);
             }
 
@@ -190,32 +221,7 @@ public:
         {
             ROS_WARN("No path found.");
         }
-    }
-
-    void reversePath()
-    {
-        if (computed_path_.empty())
-        {
-            ROS_WARN("No stored path to reverse.");
-            return;
-        }
-
-        nav_msgs::Path reversed_path;
-        reversed_path.header.frame_id = "world";
-
-        for (auto it = computed_path_.rbegin(); it != computed_path_.rend(); ++it)
-        {
-            geometry_msgs::PoseStamped reversed_pose = *it;
-            reversed_pose.header = reversed_path.header;
-
-            reversed_path.poses.clear();
-            reversed_path.poses.push_back(reversed_pose);
-            path_pub_.publish(reversed_path);
-
-            ROS_INFO("Navigating back: (%.2f, %.2f, %.2f)", reversed_pose.pose.position.x, reversed_pose.pose.position.y, reversed_pose.pose.position.z);
-            ros::Duration(0.5).sleep();
-        }
-        ROS_INFO("Reverse path completed.");
+        return solved;
     }
 
     double computeDistance(const geometry_msgs::Point &p1, const geometry_msgs::Point &p2)
