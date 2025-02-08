@@ -3,8 +3,7 @@ Panels:
     Help Height: 138
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /DepthCloud1/Auto Size1
+      Expanded: ~
       Splitter Ratio: 0.5029411911964417
     Tree Height: 727
   - Class: rviz/Selection
@@ -32,6 +31,42 @@ Toolbars:
 Visualization Manager:
   Class: ""
   Displays:
+    - Alpha: 1
+      Auto Size:
+        Auto Size Factor: 1
+        Value: true
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/DepthCloud
+      Color: 255; 255; 255
+      Color Image Topic: ""
+      Color Transformer: RGB8
+      Color Transport Hint: raw
+      Decay Time: 0
+      Depth Map Topic: /realsense/depth/image
+      Depth Map Transport Hint: raw
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: DepthCloud
+      Occlusion Compensation:
+        Occlusion Time-Out: 30
+        Value: false
+      Position Transformer: XYZ
+      Queue Size: 5
+      Selectable: true
+      Size (Pixels): 3
+      Style: Points
+      Topic Filter: true
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
     - Class: octomap_rviz_plugin/OccupancyGrid
       Enabled: true
       Max. Height Display: 40
@@ -85,42 +120,6 @@ Visualization Manager:
       Topic: /rrt_path
       Unreliable: false
       Value: true
-    - Alpha: 1
-      Auto Size:
-        Auto Size Factor: 1
-        Value: true
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/DepthCloud
-      Color: 255; 255; 255
-      Color Image Topic: ""
-      Color Transformer: RGB8
-      Color Transport Hint: raw
-      Decay Time: 0
-      Depth Map Topic: /realsense/depth/image
-      Depth Map Transport Hint: raw
-      Enabled: false
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Min Color: 0; 0; 0
-      Name: DepthCloud
-      Occlusion Compensation:
-        Occlusion Time-Out: 30
-        Value: false
-      Position Transformer: XYZ
-      Queue Size: 5
-      Selectable: true
-      Size (Pixels): 3
-      Style: Points
-      Topic Filter: true
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: false
     - Alpha: 1
       Axes Length: 1
       Axes Radius: 0.10000000149011612
@@ -181,7 +180,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 945.6066284179688
+      Distance: 878.2227172851562
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -189,17 +188,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -728.995361328125
-        Y: -0.5333183407783508
-        Z: 28.073101043701172
+        X: -551.9607543945312
+        Y: -95.90052795410156
+        Z: -119.13075256347656
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.22979827225208282
+      Pitch: 0.3397981822490692
       Target Frame: <Fixed Frame>
-      Yaw: 4.097681999206543
+      Yaw: 3.4276812076568604
     Saved: ~
 Window Geometry:
   Displays:
