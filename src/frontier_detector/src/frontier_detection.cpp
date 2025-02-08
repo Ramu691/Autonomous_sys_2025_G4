@@ -51,6 +51,7 @@ private:
 	double k_yaw ;	
 	// Frontier selection limit
 	double distance_limit;
+	int occ_neighbor_threshold;
 	// Frequency goal publish
 	int publish_goal_frequency;
 
@@ -64,13 +65,14 @@ public:
 		if (!ros::param::get("k_yaw", k_yaw)) ROS_FATAL("Required parameter k_yaw was not found on parameter server");
 		if (!ros::param::get("distance_limit", distance_limit)) ROS_FATAL("Required parameter distance_limit was not found on parameter server");
 		if (!ros::param::get("publish_goal_frequency", publish_goal_frequency)) ROS_FATAL("Required parameter publish_goal_frequency was not found on parameter server");
+		if (!ros::param::get("occ_neighbor_threshold", occ_neighbor_threshold)) ROS_FATAL("Required parameter occ_neighbor_threshold was not found on parameter server");
 
         octomap_subscriber = nh.subscribe("/octomap_binary", 1, &FrontierDetector::parseOctomap, this);
 		timer = nh.createTimer(ros::Duration(1.0/publish_goal_frequency), &FrontierDetector::publish_goal,this);
-        frontier_publisher = nh.advertise<visualization_msgs::MarkerArray>("/frontiers", 5);
+        frontier_publisher = nh.advertise<visualization_msgs::MarkerArray>("/frontiers", 1);
         Curr_Pose_Subscriber = nh.subscribe("/pose_est",1,&FrontierDetector::Current_position,this);
-        goal_publisher = nh.advertise<geometry_msgs::PoseStamped>("/goal", 5);
-        frontier_goal_publisher = nh.advertise<custom_msgs::FrontierGoalMsg>("/frontier_goal", 5);
+        goal_publisher = nh.advertise<geometry_msgs::PoseStamped>("/goal", 1);
+        frontier_goal_publisher = nh.advertise<custom_msgs::FrontierGoalMsg>("/frontier_goal", 1);
         // state_subscriber = nh.subscribe("/Current_State_stm", 1, &FrontierDetector::onStateStm, this);
 		check_path_client = nh.serviceClient<custom_msgs::CheckPath>("check_path");
         
@@ -250,9 +252,8 @@ public:
 	    	frontier_goal_message.isReachable = best_frontier.isReachable;
 			ROS_INFO("  selecting frontiers");
 	    	
-			if(best_frontier.isReachable && euclideanDistance(curr_drone_position, best_frontier.coordinates) < 40){
+			if(best_frontier.isReachable && euclideanDistance(curr_drone_position, best_frontier.coordinates) < distance_limit){
 		    	set_goal_message(best_frontier);
-		    	
 			}
         }
 	}
@@ -344,8 +345,10 @@ public:
 			}
 			
 			
-			if(addflag && frontier.neighborcount > neighborcount_threshold && add_entry_frontier && nbscore < 3){
-				frontier.isReachable = checkPath(frontier);
+			if(addflag && frontier.neighborcount > neighborcount_threshold && add_entry_frontier && nbscore < occ_neighbor_threshold){
+				//frontier.isReachable = checkPath(frontier);
+				// always settings frontier.isReachable to true seems to work
+				frontier.isReachable = true;
 				frontiers_sorted.push_back(frontier);
 			}
 		}

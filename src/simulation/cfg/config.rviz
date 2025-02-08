@@ -5,7 +5,6 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /DepthCloud1/Auto Size1
-        - /Pose2
       Splitter Ratio: 0.5029411911964417
     Tree Height: 727
   - Class: rviz/Selection
@@ -182,7 +181,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 807.3317260742188
+      Distance: 945.6066284179688
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -190,17 +189,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -789.5806884765625
-        Y: -143.943115234375
-        Z: -59.55678939819336
+        X: -728.995361328125
+        Y: -0.5333183407783508
+        Z: 28.073101043701172
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.569797933101654
+      Pitch: 0.22979827225208282
       Target Frame: <Fixed Frame>
-      Yaw: 5.222692489624023
+      Yaw: 4.097681999206543
     Saved: ~
 Window Geometry:
   Displays:

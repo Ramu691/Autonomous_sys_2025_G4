@@ -7,9 +7,10 @@ k_neighborcount: 0.1
 k_yaw: 55.0
 # Frontier selection limit
 distance_limit: 600
+occ_neighbor_threshold: 2
 # Frequency for publish_goal
-publish_goal_frequency: 10
+publish_goal_frequency: 2
 # Frontier Navigator
 navigatior/publish_des_state_frequency: 10
-navigatior/acceptance_radius: 3     # [m], acceptance_radius, for when wp of path counts as reached
+navigatior/acceptance_radius: 7     # [m], acceptance_radius, for when wp of path counts as reached
 navigatior/gain: 0.1                # [m]

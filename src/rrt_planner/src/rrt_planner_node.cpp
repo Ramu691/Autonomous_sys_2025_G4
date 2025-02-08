@@ -6,7 +6,7 @@
 #include <octomap_msgs/conversions.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/geometric/SimpleSetup.h>
-#include <ompl/geometric/planners/rrt/RRT.h>
+#include <ompl/geometric/planners/rrt/RRTstar.h>
 #include <ompl/base/ScopedState.h>
 #include <std_msgs/String.h>
 #include <custom_msgs/FrontierGoalMsg.h>
@@ -22,6 +22,7 @@ private:
     ros::Subscriber start_pose_sub_, goal_pose_sub_, octomap_sub_;
     ros::Publisher path_pub_;
     ros::ServiceServer check_path_;
+    ros::Timer timer_;
 
     octomap::OcTree *map_;
     geometry_msgs::PoseStamped start_pose_;
@@ -33,10 +34,16 @@ private:
     double step_size_factor_; // Step size factor
     double bias_; // Bias for the planner
     double timeout_; 
+    double rrt_frequency_;
 
 public:
     OMPLPathPlanner() : map_(nullptr), start_received_(false), goal_received_(false), octomap_received_(false)
     {
+        if (!ros::param::get("step_size_factor", step_size_factor_)) ROS_FATAL("Required parameter step_size_factor was not found on parameter server");
+        if (!ros::param::get("bias", bias_)) ROS_FATAL("Required parameter bias was not found on parameter server");
+        if (!ros::param::get("timeout", timeout_)) ROS_FATAL("Required parameter timeout was not found on parameter server");
+        if (!ros::param::get("rrt_frequency", rrt_frequency_)) ROS_FATAL("Required parameter rrt_frequency was not found on parameter server");
+
         start_pose_sub_ = nh_.subscribe("/pose_est", 1, &OMPLPathPlanner::startPoseCallback, this);
         goal_pose_sub_ = nh_.subscribe("/frontier_goal", 1, &OMPLPathPlanner::goalPoseCallback, this);
         octomap_sub_ = nh_.subscribe("octomap_binary", 1, &OMPLPathPlanner::octomapCallback, this);
@@ -44,9 +51,7 @@ public:
 
         check_path_ = nh_.advertiseService("check_path", &OMPLPathPlanner::handleCheckPath, this);
 
-        if (!ros::param::get("step_size_factor", step_size_factor_)) ROS_FATAL("Required parameter step_size_factor was not found on parameter server");
-        if (!ros::param::get("bias", bias_)) ROS_FATAL("Required parameter bias was not found on parameter server");
-        if (!ros::param::get("timeout", timeout_)) ROS_FATAL("Required parameter timeout was not found on parameter server");
+        timer_ = nh_.createTimer(ros::Duration(1.0/rrt_frequency_), &OMPLPathPlanner::timerCallback,this);
         ROS_INFO("OMPL Path Planner initialized.");
     }
 
@@ -68,18 +73,20 @@ public:
         return true;
     }
 
+    void timerCallback(const ros::TimerEvent& event){
+        attemptPlanning();
+	}
+
     void startPoseCallback(const geometry_msgs::PoseStamped::ConstPtr &msg)
     {
         start_pose_ = *msg;
         start_received_ = true;
-        attemptPlanning();
     }
 
     void goalPoseCallback(const custom_msgs::FrontierGoalMsg::ConstPtr &frontiergoal)
     {
         goal_pose_ = *frontiergoal;
         goal_received_ = true;
-        attemptPlanning();
     }
 
     void octomapCallback(const octomap_msgs::Octomap::ConstPtr &msg)
@@ -93,7 +100,6 @@ public:
         {
             map_resolution_ = map_->getResolution();
             octomap_received_ = true;
-            attemptPlanning();
         }
         else
         {
@@ -158,6 +164,32 @@ public:
             return false;
         }
 
+        // check rayCast before starting Planner             
+        octomap::point3d p1(start_pose_.pose.position.x, start_pose_.pose.position.y, start_pose_.pose.position.z);
+        octomap::point3d p2(goal_pose_.point.x, goal_pose_.point.y, goal_pose_.point.z);
+        octomap::point3d hit;
+        double distance = computeDistance(p1, p2);
+        if(!map_->castRay(p1, p2 - p1, hit, true, distance)){
+            // Hit nothing
+            if(onlyCheck){
+                return true;
+            }
+            // also send path
+            nav_msgs::Path ros_path;
+            ros_path.header.frame_id = "world";
+            geometry_msgs::PoseStamped pose;
+            pose.pose.position.x = p1.x();
+            pose.pose.position.y = p1.y();
+            pose.pose.position.z = p1.z();
+            ros_path.poses.push_back(pose);
+            pose.pose.position.x = p2.x();
+            pose.pose.position.y = p2.y();
+            pose.pose.position.z = p2.z();
+            ros_path.poses.push_back(pose);
+            path_pub_.publish(ros_path);
+            return true;
+        }
+
         og::SimpleSetup ss(space);
         ss.setStateValidityChecker([this](const ob::State *state) { return isStateValid(state); });
 
@@ -170,13 +202,13 @@ public:
         goal->as<ob::RealVectorStateSpace::StateType>()->values[1] = goal_pose_.point.y;
         goal->as<ob::RealVectorStateSpace::StateType>()->values[2] = goal_pose_.point.z;
 
-        ss.setStartAndGoalStates(start, goal);
-        auto planner = std::make_shared<og::RRT>(ss.getSpaceInformation());
+        ss.setStartAndGoalStates(start, goal);        
+
+        auto planner = std::make_shared<og::RRTstar>(ss.getSpaceInformation());
         planner->setRange(step_size_factor_ * map_resolution_);
         planner->setGoalBias(bias_);
         ss.setPlanner(planner);
 
-        // Solve the planning problem
         ob::PlannerStatus solved = ss.solve(timeout_);
 
         if(onlyCheck){
@@ -199,19 +231,6 @@ public:
                 pose.pose.position.x = s->values[0];
                 pose.pose.position.y = s->values[1];
                 pose.pose.position.z = s->values[2];
-
-                // check again with raytracing as aditional robustnes
-                if(!ros_path.poses.empty()){                    
-                    octomap::point3d p1(ros_path.poses[-1].pose.position.x, ros_path.poses[-1].pose.position.y, ros_path.poses[-1].pose.position.z);
-                    octomap::point3d p2(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
-                    octomap::point3d hit;
-                    double distance = computeDistance(ros_path.poses[-1].pose.position, pose.pose.position);
-                    if(map_->castRay(p1, p2 - p1, hit, true, distance)){
-                        // not successfull
-                        return false;
-                    }
-                }
-
                 ros_path.poses.push_back(pose);
             }
 
@@ -224,9 +243,9 @@ public:
         return solved;
     }
 
-    double computeDistance(const geometry_msgs::Point &p1, const geometry_msgs::Point &p2)
+    double computeDistance(const octomap::point3d &p1, const octomap::point3d &p2)
     {
-        return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2) + pow(p1.z - p2.z, 2));
+        return sqrt(pow(p1.x() - p2.x(), 2) + pow(p1.y() - p2.y(), 2) + pow(p1.z() - p2.z(), 2));
     }
 };
 
