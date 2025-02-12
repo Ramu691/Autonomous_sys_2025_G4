@@ -118,7 +118,11 @@ public:
         double z = state3D->values[2];
 
         octomap::OcTreeNode *node = map_->search(x, y, z);
-        return node == nullptr || node->getOccupancy() <= 0.5;
+        // If we don't have data, assume the space is occupied to be safe
+        if (node == nullptr)
+            return false;
+
+        return node->getOccupancy() <= 0.5;
     }
 
     void attemptPlanning()
