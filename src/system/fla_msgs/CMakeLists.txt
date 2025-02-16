@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   message_generation
+  roscpp
 )
 
 add_message_files(
@@ -38,6 +39,7 @@ generate_messages(
 )
 
 catkin_package(
+  CATKIN_DEPENDS message_runtime std_msgs geometry_msgs
 )
 
 include_directories(

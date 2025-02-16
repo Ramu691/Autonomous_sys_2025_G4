@@ -2,10 +2,12 @@
 <launch>
   <include file="$(find simulation)/launch/simulation.launch" />
   <include file="$(find controller_pkg)/launch/controller_pkg.launch" />
+  
   <include file="$(find perception_pkg)/launch/perception.launch" />
   <include file="$(find frontier_detector)/launch/frontier_detector.launch" />
   <include file="$(find rrt_planner)/launch/rrt_planner.launch" />
   <node pkg="move_pkg" type="lantern_detector" name="move_pkg"/>  
+  <node pkg="system" type="state_machine_node" name="state_machine_node" output="screen"/>
   <!-- Comment in the following line to show visualization in rviz -->
   <!-- Make sure to install the following plugin before: "sudo apt-get install ros-noetic-octomap-rviz-plugins" -->
   <node type="rviz" name="rviz" pkg="rviz" args="-d $(find simulation)/cfg/config.rviz" />

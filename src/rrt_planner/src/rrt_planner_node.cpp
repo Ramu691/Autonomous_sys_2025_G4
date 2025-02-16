@@ -19,7 +19,7 @@ class OMPLPathPlanner
 {
 private:
     ros::NodeHandle nh_;
-    ros::Subscriber start_pose_sub_, goal_pose_sub_, octomap_sub_;
+    ros::Subscriber start_pose_sub_, goal_pose_sub_, octomap_sub_,state_subscriber_;
     ros::Publisher path_pub_;
     ros::ServiceServer check_path_;
     ros::Timer timer_;
@@ -28,7 +28,7 @@ private:
     geometry_msgs::PoseStamped start_pose_;
     custom_msgs::FrontierGoalMsg goal_pose_;
     bool start_received_, goal_received_, octomap_received_;
-    std::string stm_state_ = "Explore Cave";
+    std::string stm_state_ ;
 
     double map_resolution_;
     double step_size_factor_; // Step size factor
@@ -48,6 +48,7 @@ public:
         goal_pose_sub_ = nh_.subscribe("/frontier_goal", 1, &OMPLPathPlanner::goalPoseCallback, this);
         octomap_sub_ = nh_.subscribe("octomap_binary", 1, &OMPLPathPlanner::octomapCallback, this);
         path_pub_ = nh_.advertise<nav_msgs::Path>("rrt_path", 1);
+        state_subscriber_ = nh_.subscribe("/stm_mode", 1, &OMPLPathPlanner::onStateStm, this);
 
         check_path_ = nh_.advertiseService("check_path", &OMPLPathPlanner::handleCheckPath, this);
 
@@ -55,10 +56,13 @@ public:
         ROS_INFO("OMPL Path Planner initialized.");
     }
 
-    ~OMPLPathPlanner()
-    {
+    ~OMPLPathPlanner(){
         if (map_)
             delete map_;
+    }
+
+    void onStateStm(const std_msgs::String& cur_state){
+      stm_state_ = cur_state.data;
     }
 
     bool handleCheckPath(custom_msgs::CheckPath::Request &req,
@@ -127,7 +131,7 @@ public:
 
     void attemptPlanning()
     {
-        if (start_received_ && goal_received_ && octomap_received_ && stm_state_ == "Explore Cave")
+        if (start_received_ && goal_received_ && octomap_received_ && stm_state_ == "EXPLORE")
         {
             ROS_INFO("Attempting to plan a path...");
             planPath();
