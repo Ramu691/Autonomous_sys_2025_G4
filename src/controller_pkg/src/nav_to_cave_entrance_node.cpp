@@ -28,6 +28,7 @@ class UAVController{
     double initial_x, initial_y, initial_z;
     double delta_x, delta_y, delta_z;
     double acceptance_radius, gain;
+    std::string statemachine_state;
     
     Position waypoints[NUM_WP] = {Position(-324.0, 10.0, 16.0, 3.14)};  
 
@@ -37,10 +38,14 @@ class UAVController{
     public:
         UAVController(){
             state_subscriber = nh.subscribe("/pose_est", 1, &UAVController::stateCallback, this);
+            state_subscriber = nh.subscribe("/stm_mode", 1, &UAVController::onStateStm, this);
             des_state_publisher = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("desired_state", 1);
             if (!ros::param::get("controller/acceptance_radius", acceptance_radius)) ROS_FATAL("Required parameter controller/acceptance_radius was not found on parameter server");
             if (!ros::param::get("controller/gain", gain)) ROS_FATAL("Required parameter controller/gain was not found on parameter server");
         }
+        void onStateStm(const std_msgs::String& cur_state){
+	 	statemachine_state = cur_state.data;
+	}
         
         double calculate_error(double desired_pose, double actual_pose){
             return gain * (desired_pose - actual_pose);
@@ -48,7 +53,8 @@ class UAVController{
                 
         void stateCallback(const geometry_msgs::PoseStamped& current_pose){   
             // Set time_start as soon as first stateCallback arrives   
-            if(time_start == -1){
+            //if(time_start == -1 && statemachine_state=="NAVIGATE" ){
+            if(time_start == -1 && statemachine_state=="NAVIGATE" ){
                 time_start = ros::Time::now().toSec();
             }
             current_x = current_pose.pose.position.x;

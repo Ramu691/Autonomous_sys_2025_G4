@@ -14,47 +14,11 @@
 #include <std_srvs/Empty.h>					//
 #include <custom_msgs/CheckPath.h>
 
+#define TFOUTPUT 1
 #define TOL 1
 
-class FrontierDetector{
-private:
-	struct Point3D {
-	    double x, y, z;
-	};
-	
-	struct Frontier{
-		Point3D coordinates;
-		int neighborcount = 0;
-		double score = 0;
-		bool isReachable = false;
-	};
-
-    ros::NodeHandle nh;
-    ros::Subscriber octomap_subscriber, Curr_Pose_Subscriber, goal_subscriber, state_subscriber;
-    ros::Publisher frontier_publisher, goal_publisher, frontier_goal_publisher;
-	ros::ServiceClient check_path_client;
-    ros::Timer timer;
-
-    double drone_yaw;
-    Point3D curr_drone_position, goal_Curr_Pose_Subscriber, cave_entry_point;
-	geometry_msgs::PoseStamped goal_message;
-	custom_msgs::FrontierGoalMsg frontier_goal_message;	
-	float octomap_res;
-	std::string statemachine_state;
-	
-	// Frontier grouping
-	int neighborcount_threshold;
-	int bandwidth;
-	// Frontier selection score
-	double k_distance;
-	double k_neighborcount;
-	double k_yaw ;	
-	// Frontier selection limit
-	double distance_limit;
-	int occ_neighbor_threshold;
-	// Frequency goal publish
-	int publish_goal_frequency;
-
+class StateMachine
+{
 public:
     FrontierDetector(){
 		// Read Params
@@ -100,10 +64,35 @@ public:
 		double roll, pitch, yaw;
 		mat.getRPY(roll, pitch, drone_yaw);
 
-		// Check if drone has reached the cave entry point
-        if (abs(curr_drone_position.x - cave_entry_point.x) < 1.0 && abs(curr_drone_position.y - cave_entry_point.y) < 1.0 && abs(curr_drone_position.z - cave_entry_point.z) < 1.0 && abs(drone_yaw - 3.14) < 0.1) {
-            if (statemachine_state != "Explore Cave") {
-                ROS_INFO("Reached cave entry. Starting cave exploration.");
+      // State transitions (using your original logic)
+      if (current_state_.data == "Begin")
+      {
+        ros::param::set("/Current_State", "Take off");
+        nh_.getParam("Current_State", current_state_.data);
+      }
+      else if (current_state_.data == "Take off")
+      {
+        desired_pose.setOrigin(tf::Vector3(-43.0, 10.0, 20.0));
+        if (toleranceCheck(desired_pose))
+        {
+          ros::param::set("/Current_State", "Flying to cave entry");
+          nh_.getParam("Current_State", current_state_.data);
+        }
+      }
+      else if (current_state_.data == "Flying to cave entry")
+      {
+        desired_pose.setOrigin(tf::Vector3(-316.0, 10.0, 20.0));
+        if (toleranceCheck(desired_pose))
+        {
+          ros::param::set("/Current_State", "Moving down to entrance height");
+          nh_.getParam("Current_State", current_state_.data);
+        }
+      }
+      else if (current_state_.data == "Moving down to entrance height")
+      {
+        desired_pose.setOrigin(tf::Vector3(-321.0, 10.0, 15.0));
+        if (toleranceCheck(desired_pose))
+        {
                 ros::param::set("/Current_State", "Explore Cave");
 				statemachine_state="Explore Cave";
                 resetOctomap();
