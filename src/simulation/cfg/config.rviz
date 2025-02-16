@@ -136,22 +136,6 @@ Visualization Manager:
       Topic: /goal
       Unreliable: false
       Value: true
-    - Alpha: 1
-      Axes Length: 1
-      Axes Radius: 0.10000000149011612
-      Class: rviz/Pose
-      Color: 92; 53; 102
-      Enabled: true
-      Head Length: 2
-      Head Radius: 1
-      Name: Pose
-      Queue Size: 10
-      Shaft Length: 3
-      Shaft Radius: 0.5
-      Shape: Arrow
-      Topic: /current_waypoint
-      Unreliable: false
-      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48

@@ -26,10 +26,10 @@ private:
     void trajCallback(const trajectory_msgs::MultiDOFJointTrajectoryPoint &msg)
     {
         desired_pub_.publish(msg);
-        ROS_INFO_THROTTLE(1.0, "Forwarding point -> pos(%.2f,%.2f,%.2f)",
+        /*ROS_INFO_THROTTLE(1.0, "Forwarding point -> pos(%.2f,%.2f,%.2f)",
                           msg.transforms[0].translation.x,
                           msg.transforms[0].translation.y,
-                          msg.transforms[0].translation.z);
+                          msg.transforms[0].translation.z);*/
     }
 
     void poseCallback(const geometry_msgs::PoseStamped& msg) {

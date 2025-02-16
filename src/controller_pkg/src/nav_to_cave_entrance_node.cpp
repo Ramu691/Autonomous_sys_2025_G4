@@ -27,7 +27,7 @@ class UAVController{
     double current_x, current_y, current_z;
     double initial_x, initial_y, initial_z;
     double delta_x, delta_y, delta_z;
-    double acceptance_radius, gain;
+    double gain;
     std::string statemachine_state;
     
     Position waypoints[NUM_WP] = {Position(-38.0, 10.0, 20.0, 3.14),Position(-324.0, 10.0, 16.0, 3.14)};  
@@ -40,7 +40,6 @@ class UAVController{
             state_subscriber = nh.subscribe("/stm_mode", 1, &UAVController::onStateStm, this);
             position_subscriber = nh.subscribe("/pose_est", 1, &UAVController::stateCallback, this);
             des_state_publisher = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("desired_state", 1);
-            if (!ros::param::get("controller/acceptance_radius", acceptance_radius)) ROS_FATAL("Required parameter controller/acceptance_radius was not found on parameter server");
             if (!ros::param::get("controller/gain", gain)) ROS_FATAL("Required parameter controller/gain was not found on parameter server");
         }
 
@@ -51,6 +50,8 @@ class UAVController{
                 waypoint_index = 0;
             } else if (statemachine_state == "NAVIGATE") {
                 waypoint_index = 1;
+            } else if (statemachine_state == "EXPLORE") {
+                ros::shutdown();
             }
         }
         
@@ -60,19 +61,12 @@ class UAVController{
                 
         void stateCallback(const geometry_msgs::PoseStamped& current_pose){   
             // Set time_start as soon as first stateCallback arrives 
-            //if(statemachine_state =="NAVIGATIOacceptance_radiusN"){  
             if(time_start == -1 ){
                 time_start = ros::Time::now().toSec();
             }
             current_x = current_pose.pose.position.x;
             current_y = current_pose.pose.position.y;
             current_z = current_pose.pose.position.z;
-            
-            //  // Check if the UAV has reached the current waypoint
-            // double distance_to_waypoint=sqrt(pow(current_x - waypoints[waypoint_index].x_position, 2) + 
-            //         pow(current_y - waypoints[waypoint_index].y_position, 2) + 
-            //         pow(current_z - waypoints[waypoint_index].z_position, 2));
-            
 
             initial_x = current_x;
             initial_y = current_y;

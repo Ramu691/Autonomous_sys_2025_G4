@@ -38,8 +38,8 @@ bool frontier_goal_received = false;
 void frontierGoalCallback(const custom_msgs::FrontierGoalMsg::ConstPtr& msg) {
   latest_frontier_goal = *msg;
   frontier_goal_received = true;
-  ROS_INFO("Frontier goal received: x=%f, y=%f, z=%f",
-           msg->point.x, msg->point.y, msg->point.z);
+  // ROS_INFO("Frontier goal received: x=%f, y=%f, z=%f",
+  //         msg->point.x, msg->point.y, msg->point.z);
 }
 
 
@@ -67,14 +67,14 @@ int main(int argc, char** argv) {
   take_off.pose.position.z = 20;
   take_off.pose.orientation.w = 1.0;
 
-  ros::Rate rate(100);
+  ros::Rate rate(5);
   ros::Time last_transition_time = ros::Time::now();
   ros::Time state_entry_time = ros::Time::now();
 
   // Transition parameters.
   double takeoff_altitude = 15.0;
   double takeoff_threshold = 2.0;
-  double cave_threshold = 2.0;  // Increased threshold so the state transitions when within 20 m of the cave entrance.
+  double cave_threshold = 5.0;  // Increased threshold so the state transitions when within 5 m of the cave entrance.
   double landing_threshold = 0.5;
   double explore_duration = 100000.0; // For now, exploration runs indefinitely (or until manually terminated).
 

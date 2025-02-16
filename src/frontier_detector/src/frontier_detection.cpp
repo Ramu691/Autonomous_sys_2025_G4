@@ -85,6 +85,12 @@ public:
     
     void onStateStm(const std_msgs::String& cur_state){
 		statemachine_state = cur_state.data;
+		// Check if drone has reached the cave entry point
+		if (statemachine_state == "EXPLORE" && !octomap_reset_done) {
+			ROS_INFO("Reached cave entry. Resetting OctoMap and starting cave exploration.");
+			resetOctomap();
+			octomap_reset_done = true; // Set flag so it doesn't reset again
+		}
 	}
 		
     
@@ -100,32 +106,7 @@ public:
 		tf2::Matrix3x3 mat(quat);
 		double roll, pitch, yaw;
 		mat.getRPY(roll, pitch, drone_yaw);
-
-		// Check if drone has reached the cave entry point
-        // if (abs(curr_drone_position.x - cave_entry_point.x) < 2.0 &&
-		// 	abs(curr_drone_position.y - cave_entry_point.y) < 2.0 && 
-		// 	abs(curr_drone_position.z - cave_entry_point.z) < 2.0 && abs(drone_yaw - 3.14) < 0.2 && 
-		// 	statemachine_state == "EXPLORE") 
-		//  if (abs(curr_drone_position.x - cave_entry_point.x) < 2.5 &&
-		// 	abs(curr_drone_position.y - cave_entry_point.y) < 2.5 && 
-		// 	abs(curr_drone_position.z - cave_entry_point.z) < 2.5 && abs(drone_yaw - 3.14) < 0.5 && 
-		// 	statemachine_state == "EXPLORE") {
-        //     //if (statemachine_state != "Explore Cave") {
-        //         ROS_INFO("Reached cave entry. Starting cave exploration.");
-        //         //ros::param::set("/Current_State", "Explore Cave");
-		// 		//statemachine_state="Explore Cave";
-        //         resetOctomap();
-        //     }
-		// Check if the drone has reached the cave entry point
-		if (statemachine_state == "EXPLORE") {
-			
-			if (!octomap_reset_done) {  // Only reset if not done before
-				ROS_INFO("Reached cave entry. Resetting OctoMap and starting cave exploration.");
-				resetOctomap();
-				octomap_reset_done = true; // Set flag so it doesn't reset again
-			}
-		}
-        }
+	}
     
 
 	void resetOctomap() {
@@ -225,15 +206,16 @@ public:
 	}
 	
 	void publish_goal(const ros::TimerEvent& event){
+		if(statemachine_state != "EXPLORE"){
+			return;
+		}
 		Point3D goal_point;
 		goal_point.x = goal_message.pose.position.x;
 		goal_point.y = goal_message.pose.position.y;
 		goal_point.z = goal_message.pose.position.z;
-		if(statemachine_state == "EXPLORE"){
-	    	goal_publisher.publish(goal_message);
-	    	frontier_goal_publisher.publish(frontier_goal_message);
-			ROS_INFO(" publishing goal ");
-	    }
+		goal_publisher.publish(goal_message);
+		frontier_goal_publisher.publish(frontier_goal_message);
+		ROS_INFO(" publishing goal ");
 	}
 	
 	void set_goal_message(Frontier best_frontier){
@@ -376,6 +358,10 @@ public:
 //with partially help of Chatgpt, with the main focus to pase the binary octomap while Exploring cave
 // http://docs.ros.org/en/noetic/api/octomap_msgs/html/msg/Octomap.html
     void parseOctomap(const octomap_msgs::Octomap::ConstPtr& octomap_msg){ 
+		// Don't no anything, if it's not EXPLORE state
+		if(statemachine_state != "EXPLORE"){
+			return;
+		}
 		////Convert an octomap representation to a new octree (full probabilities or binary). You will need to free the memory. Return NULL on error. 
         octomap::AbstractOcTree* tree = octomap_msgs::msgToMap(*octomap_msg);
 		//Creates a new octree by deserializing from a message that contains the full map information (i.e., binary is false) and returns
@@ -406,22 +392,16 @@ public:
 				    }
 				}
             }
-            
-            //std::cout << frontiers.size() << "\n";
-            if(statemachine_state == "EXPLORE"){
-		        std::vector<Point3D> frontierpoints_clustered;
-		        frontierpoints_clustered = meanShiftClustering(frontiers, 1);
-		        
-		                    
-		        std::vector<Frontier> frontierpoints_sorted;
-		        frontierpoints_sorted = sort_frontiers(frontierpoints_clustered, octree);
-		                    
-		        select_frontier(frontierpoints_sorted);
-		       	publish_markers(frontierpoints_sorted);
-		    }
+			std::vector<Point3D> frontierpoints_clustered;
+			frontierpoints_clustered = meanShiftClustering(frontiers, 1);
+						
+			std::vector<Frontier> frontierpoints_sorted;
+			frontierpoints_sorted = sort_frontiers(frontierpoints_clustered, octree);
 
-        }
-        else{
+			select_frontier(frontierpoints_sorted);
+			publish_markers(frontierpoints_sorted);
+
+        } else {
             ROS_ERROR("Failed to parse octomap message");
         }
         delete octree;
