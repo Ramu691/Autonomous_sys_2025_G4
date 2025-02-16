@@ -38,8 +38,8 @@ class UAVController{
         UAVController(){
             state_subscriber = nh.subscribe("/pose_est", 1, &UAVController::stateCallback, this);
             des_state_publisher = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("desired_state", 1);
-            nh.param<double>("acceptance_radius", acceptance_radius, 3);
-            nh.param<double>("gain", gain, 0.05);
+            if (!ros::param::get("controller/acceptance_radius", acceptance_radius)) ROS_FATAL("Required parameter controller/acceptance_radius was not found on parameter server");
+            if (!ros::param::get("controller/gain", gain)) ROS_FATAL("Required parameter controller/gain was not found on parameter server");
         }
         
         double calculate_error(double desired_pose, double actual_pose){
