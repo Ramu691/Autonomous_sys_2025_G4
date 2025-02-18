@@ -1,0 +1,6 @@
+<launch>
+   <rosparam command="load" file="$(find frontier_detector)/params/frontier_detector.yaml" />
+   <node pkg="frontier_detector" type="frontier_detection" name="frontier_detector"/>
+   <node pkg="frontier_detector" type="traj_gen" name="traj_gen"/>
+   <node pkg="frontier_detector" type="frontier_navigator" name="frontier_navigator" output="screen"/>
+</launch>

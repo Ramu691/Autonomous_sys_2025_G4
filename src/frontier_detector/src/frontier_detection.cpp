@@ -12,6 +12,7 @@
 #include <custom_msgs/FrontierGoalMsg.h>	//
 #include <std_msgs/String.h>				//
 #include <std_srvs/Empty.h>					//
+#include <custom_msgs/CheckPath.h>
 
 #define TOL 1
 
@@ -31,6 +32,7 @@ private:
     ros::NodeHandle nh;
     ros::Subscriber octomap_subscriber, Curr_Pose_Subscriber, goal_subscriber, state_subscriber;
     ros::Publisher frontier_publisher, goal_publisher, frontier_goal_publisher;
+	ros::ServiceClient check_path_client;
     ros::Timer timer;
 
     double drone_yaw;
@@ -40,22 +42,40 @@ private:
 	float octomap_res;
 	std::string statemachine_state;
 	
-	
-	// score function gains to rank the frontiers (Parameter Tunning needed)
-	double k_distance = 1.0;
-	double k_neighborcount = 0.1;
-	double k_yaw = 30.0;
-
+	// Frontier grouping
+	int neighborcount_threshold;
+	int bandwidth;
+	// Frontier selection score
+	double k_distance;
+	double k_neighborcount;
+	double k_yaw ;	
+	// Frontier selection limit
+	double distance_limit;
+	int occ_neighbor_threshold;
+	// Frequency goal publish
+	int publish_goal_frequency;
+	bool octomap_reset_done = false; // Global flag to track reset
 
 public:
     FrontierDetector(){
+		// Read Params
+		if (!ros::param::get("neighborcount_threshold", neighborcount_threshold)) ROS_FATAL("Required parameter neighborcount_threshold was not found on parameter server");
+		if (!ros::param::get("bandwidth", bandwidth)) ROS_FATAL("Required parameter bandwidth was not found on parameter server");
+		if (!ros::param::get("k_distance", k_distance)) ROS_FATAL("Required parameter k_distance was not found on parameter server");
+		if (!ros::param::get("k_neighborcount", k_neighborcount)) ROS_FATAL("Required parameter k_neighborcount was not found on parameter server");
+		if (!ros::param::get("k_yaw", k_yaw)) ROS_FATAL("Required parameter k_yaw was not found on parameter server");
+		if (!ros::param::get("distance_limit", distance_limit)) ROS_FATAL("Required parameter distance_limit was not found on parameter server");
+		if (!ros::param::get("publish_goal_frequency", publish_goal_frequency)) ROS_FATAL("Required parameter publish_goal_frequency was not found on parameter server");
+		if (!ros::param::get("occ_neighbor_threshold", occ_neighbor_threshold)) ROS_FATAL("Required parameter occ_neighbor_threshold was not found on parameter server");
+
         octomap_subscriber = nh.subscribe("/octomap_binary", 1, &FrontierDetector::parseOctomap, this);
-		timer = nh.createTimer(ros::Duration(1.0), &FrontierDetector::publish_goal,this);
-        frontier_publisher = nh.advertise<visualization_msgs::MarkerArray>("/frontiers", 1000);
+		timer = nh.createTimer(ros::Duration(1.0/publish_goal_frequency), &FrontierDetector::publish_goal,this);
+        frontier_publisher = nh.advertise<visualization_msgs::MarkerArray>("/frontiers", 1);
         Curr_Pose_Subscriber = nh.subscribe("/pose_est",1,&FrontierDetector::Current_position,this);
-        goal_publisher = nh.advertise<geometry_msgs::PoseStamped>("/goal", 1000);
-        frontier_goal_publisher = nh.advertise<custom_msgs::FrontierGoalMsg>("/frontier_goal", 1000);
-        // state_subscriber = nh.subscribe("/Current_State_stm", 1, &FrontierDetector::onStateStm, this);
+        goal_publisher = nh.advertise<geometry_msgs::PoseStamped>("/goal", 1);
+        frontier_goal_publisher = nh.advertise<custom_msgs::FrontierGoalMsg>("/frontier_goal", 1);
+        state_subscriber = nh.subscribe("/stm_mode", 1, &FrontierDetector::onStateStm, this);
+		check_path_client = nh.serviceClient<custom_msgs::CheckPath>("check_path");
         
         // cave entry coordinates
 		cave_entry_point.x = -321.0;
@@ -63,9 +83,15 @@ public:
 		cave_entry_point.z = 15.0;
     }
     
-    // void onStateStm(const std_msgs::String& cur_state){
-	// 	statemachine_state = cur_state.data;
-	// }
+    void onStateStm(const std_msgs::String& cur_state){
+		statemachine_state = cur_state.data;
+		// Check if drone has reached the cave entry point
+		if (statemachine_state == "EXPLORE" && !octomap_reset_done) {
+			ROS_INFO("Reached cave entry. Resetting OctoMap and starting cave exploration.");
+			resetOctomap();
+			octomap_reset_done = true; // Set flag so it doesn't reset again
+		}
+	}
 		
     
     void Current_position(const geometry_msgs::PoseStamped& msg){
@@ -80,17 +106,8 @@ public:
 		tf2::Matrix3x3 mat(quat);
 		double roll, pitch, yaw;
 		mat.getRPY(roll, pitch, drone_yaw);
-
-		// Check if drone has reached the cave entry point
-        if (abs(curr_drone_position.x - cave_entry_point.x) < 3.0 && abs(curr_drone_position.y - cave_entry_point.y) < 3.0 && abs(curr_drone_position.z - cave_entry_point.z) < 3.0 && abs(drone_yaw - 3.14) < 0.1) {
-            if (statemachine_state != "Explore Cave") {
-                ROS_INFO("Reached cave entry. Starting cave exploration.");
-                ros::param::set("/Current_State", "Explore Cave");
-				statemachine_state="Explore Cave";
-                resetOctomap();
-            }
-        }
-    }
+	}
+    
 
 	void resetOctomap() {
         std_srvs::Empty empty_srv;
@@ -100,6 +117,21 @@ public:
         }
         ROS_INFO("Octomap reset.");
     }
+
+	bool checkPath(Frontier frontier){
+		custom_msgs::CheckPath srv;
+		srv.request.goal_pos.point.x = frontier.coordinates.x;
+		srv.request.goal_pos.point.y = frontier.coordinates.y;
+		srv.request.goal_pos.point.z = frontier.coordinates.z;
+
+		if (check_path_client.call(srv)) {
+			ROS_INFO("Path found: %s", srv.response.pathFound ? "true" : "false");
+			return srv.response.pathFound;
+		} else {
+			ROS_ERROR("Failed to call service");
+		}
+		return false;
+	}
         
     double euclideanDistance(Point3D p1, Point3D p2) {
 		double dx = p1.x - p2.x;
@@ -109,12 +141,12 @@ public:
 	}
 
 	// Gaussian kernel function
-	double gaussianKernel(double distance, double bandwidth) {
+	double gaussianKernel(double distance) {
 		return exp(-(distance * distance) / (2 * bandwidth * bandwidth));
 	}
 
 	// Perform mean shift clustering - implemented with help from chatgpt
-	std::vector<Point3D> meanShiftClustering(std::vector<Frontier> points, double bandwidth, double convergenceThreshold) {
+	std::vector<Point3D> meanShiftClustering(std::vector<Frontier> points, double convergenceThreshold) {
 		std::vector<Point3D> shiftedPoints;
 		ROS_INFO("MeanShiftClustering algorithm starting");
 		
@@ -135,7 +167,7 @@ public:
 
 		        for (const Frontier& p : points) {
 		            double distance = euclideanDistance(originalPoint, p.coordinates);
-		            double weight = gaussianKernel(distance, bandwidth);
+		            double weight = gaussianKernel(distance);
 
 		            shiftVector.x += p.coordinates.x * weight;
 		            shiftVector.y += p.coordinates.y * weight;
@@ -174,15 +206,16 @@ public:
 	}
 	
 	void publish_goal(const ros::TimerEvent& event){
+		if(statemachine_state != "EXPLORE"){
+			return;
+		}
 		Point3D goal_point;
 		goal_point.x = goal_message.pose.position.x;
 		goal_point.y = goal_message.pose.position.y;
 		goal_point.z = goal_message.pose.position.z;
-		if(statemachine_state == "Explore Cave"){
-	    	goal_publisher.publish(goal_message);
-	    	frontier_goal_publisher.publish(frontier_goal_message);
-			ROS_INFO(" publishing goal ");
-	    }
+		goal_publisher.publish(goal_message);
+		frontier_goal_publisher.publish(frontier_goal_message);
+		ROS_INFO(" publishing goal ");
 	}
 	
 	void set_goal_message(Frontier best_frontier){
@@ -218,10 +251,9 @@ public:
 	    	frontier_goal_message.isReachable = best_frontier.isReachable;
 			ROS_INFO("  selecting frontiers");
 	    	
-			if(best_frontier.isReachable && euclideanDistance(curr_drone_position, best_frontier.coordinates) < 40){
+			if(best_frontier.isReachable && euclideanDistance(curr_drone_position, best_frontier.coordinates) < distance_limit){
 		    	set_goal_message(best_frontier);
-		    	
-		    }
+			}
         }
 	}
 	
@@ -312,15 +344,10 @@ public:
 			}
 			
 			
-			if(addflag && frontier.neighborcount > 120 && add_entry_frontier && nbscore < 3){
-				octomap::point3d drone_point(curr_drone_position.x, curr_drone_position.y, curr_drone_position.z);
-				octomap::point3d direction(frontier.coordinates.x-curr_drone_position.x,frontier.coordinates.y-curr_drone_position.y,frontier.coordinates.z-curr_drone_position.z);
-				double d = euclideanDistance(curr_drone_position, frontier.coordinates);
-				octomap::point3d end;
-				frontier.isReachable = !octree->castRay(drone_point, direction, end, true, d);
-				//std::cout << frontier.isReachable << "\n";
-				//std::cout << end << "\n";
-				//std::cout << frontier.coordinates.x << "\t" << frontier.coordinates.y << "\t" << frontier.coordinates.z << "\n";
+			if(addflag && frontier.neighborcount > neighborcount_threshold && add_entry_frontier && nbscore < occ_neighbor_threshold){
+				//frontier.isReachable = checkPath(frontier);
+				// always settings frontier.isReachable to true seems to work
+				frontier.isReachable = true;
 				frontiers_sorted.push_back(frontier);
 			}
 		}
@@ -331,6 +358,10 @@ public:
 //with partially help of Chatgpt, with the main focus to pase the binary octomap while Exploring cave
 // http://docs.ros.org/en/noetic/api/octomap_msgs/html/msg/Octomap.html
     void parseOctomap(const octomap_msgs::Octomap::ConstPtr& octomap_msg){ 
+		// Don't no anything, if it's not EXPLORE state
+		if(statemachine_state != "EXPLORE"){
+			return;
+		}
 		////Convert an octomap representation to a new octree (full probabilities or binary). You will need to free the memory. Return NULL on error. 
         octomap::AbstractOcTree* tree = octomap_msgs::msgToMap(*octomap_msg);
 		//Creates a new octree by deserializing from a message that contains the full map information (i.e., binary is false) and returns
@@ -361,22 +392,16 @@ public:
 				    }
 				}
             }
-            
-            //std::cout << frontiers.size() << "\n";
-            if(statemachine_state == "Explore Cave"){
-		        std::vector<Point3D> frontierpoints_clustered;
-		        frontierpoints_clustered = meanShiftClustering(frontiers, 17.0, 1);
-		        
-		                    
-		        std::vector<Frontier> frontierpoints_sorted;
-		        frontierpoints_sorted = sort_frontiers(frontierpoints_clustered, octree);
-		                    
-		        select_frontier(frontierpoints_sorted);
-		       	publish_markers(frontierpoints_sorted);
-		    }
+			std::vector<Point3D> frontierpoints_clustered;
+			frontierpoints_clustered = meanShiftClustering(frontiers, 1);
+						
+			std::vector<Frontier> frontierpoints_sorted;
+			frontierpoints_sorted = sort_frontiers(frontierpoints_clustered, octree);
 
-        }
-        else{
+			select_frontier(frontierpoints_sorted);
+			publish_markers(frontierpoints_sorted);
+
+        } else {
             ROS_ERROR("Failed to parse octomap message");
         }
         delete octree;

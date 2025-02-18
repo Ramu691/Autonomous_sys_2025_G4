@@ -1,0 +1,4 @@
+<launch>
+  <!-- Launch the state machine node -->
+  <node pkg="system" type="state_machine_node" name="state_machine_node" output="screen"/>
+</launch>

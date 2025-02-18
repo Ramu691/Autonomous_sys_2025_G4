@@ -5,7 +5,7 @@ set (CMAKE_CXX_STANDARD 11)
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
 find_package(octomap REQUIRED) 
-
+find_package(Eigen3 REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
@@ -17,17 +17,9 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   message_generation
   custom_msgs
+  geometry_msgs
 )
 
-
-
-
-## Generate added messages and services with any dependencies listed here
- generate_messages(
-   DEPENDENCIES
-   std_msgs
-   geometry_msgs
- )
 
 ###################################
 ## catkin specific configuration ##
@@ -48,6 +40,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/include
   ${catkin_INCLUDE_DIRS}
   ${OCTOMAP_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
 )
 
 link_libraries(${OCTOMAP_LIBRARIES})
@@ -56,9 +49,27 @@ add_executable(frontier_detection src/frontier_detection.cpp)
 add_dependencies(frontier_detection ${catkin_EXPORTED_TARGETS})
 target_link_libraries(frontier_detection ${catkin_LIBRARIES})
 
+add_executable(traj_gen src/traj_gen.cpp)
+add_dependencies(traj_gen ${catkin_EXPORTED_TARGETS})
+target_link_libraries(traj_gen ${catkin_LIBRARIES})
+
+
+add_executable(frontier_navigator src/frontier_navigator.cpp)
+add_dependencies(frontier_navigator ${catkin_EXPORTED_TARGETS})
+target_link_libraries(frontier_navigator ${catkin_LIBRARIES})
+
 ## Specify libraries to link a library or executable target against
 target_link_libraries(frontier_detection
   ${catkin_LIBRARIES}
   ${OCTOMAP_LIBRARIES}
 )
+target_link_libraries(frontier_navigator
+  ${catkin_LIBRARIES}
+  ${OCTOMAP_LIBRARIES}
+)
+target_link_libraries(traj_gen
+  ${catkin_LIBRARIES}
+  ${OCTOMAP_LIBRARIES}
+)
+
 
