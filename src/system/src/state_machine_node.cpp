@@ -1,5 +1,4 @@
 #include <ros/ros.h>
-// #include "fla_msgs/ControlMessage.h"
 #include <std_msgs/Bool.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Path.h>
@@ -8,8 +7,6 @@
 #include <octomap_msgs/Octomap.h>
 #include <tf/transform_broadcaster.h>
 #include <math.h>
-// #include "mav_state_machine_msgs/RunTaskService.h"
-// #include "mav_state_machine_msgs/StartStopTask.h"
 #include <std_msgs/String.h>
 #include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
 // Include the custom frontier message
