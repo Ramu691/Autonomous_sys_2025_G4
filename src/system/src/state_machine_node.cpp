@@ -11,7 +11,8 @@
 #include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
 // Include the custom frontier message
 #include <custom_msgs/FrontierGoalMsg.h>
-#define NUM_WP 2
+#include <std_msgs/Int16.h>
+
 
 // Define mission states.
 enum RobotState { IDLE, TAKEOFF, NAVIGATE, EXPLORE, LAND };
@@ -19,6 +20,9 @@ enum RobotState { IDLE, TAKEOFF, NAVIGATE, EXPLORE, LAND };
 // Global mission state and current feedback.
 RobotState current_state = IDLE;
 geometry_msgs::PoseStamped current_pose;
+
+std_msgs::Int16 num_of_lantern;
+
 
 // Callback to update current state from /current_state_est.
 void currentStateCallback(const nav_msgs::Odometry::ConstPtr& msg) {
@@ -39,10 +43,22 @@ void frontierGoalCallback(const custom_msgs::FrontierGoalMsg::ConstPtr& msg) {
   //         msg->point.x, msg->point.y, msg->point.z);
 }
 
+// void num_lantern_callback(const std_msgs::String::ConstPtr& num) {
+//     try {
+//         num_of_lantern = std::stoi(num->data);
+//     } catch (const std::exception& e) {
+//         ROS_ERROR("Failed to convert num_lantern string to int: %s", e.what());
+//     }
+// }
+void num_lantern_callback(const std_msgs::Int16::ConstPtr& msg) {
+        num_of_lantern.data = msg->data;  
+        //ROS_INFO("Received number of lanterns: %d", num_of_lantern.data);       
+}
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "state_machine_node");
   ros::NodeHandle nh;
+  num_of_lantern.data=0;
   ros::Publisher desired_state_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 1, true);
   ros::Publisher stm_mode_pub = nh.advertise<std_msgs::String>("/stm_mode", 10);
 
@@ -50,6 +66,9 @@ int main(int argc, char** argv) {
   ros::Subscriber current_state_sub = nh.subscribe("/current_state_est", 10, currentStateCallback);
   // Subscribe to frontier goal from the frontier detector.
   ros::Subscriber frontier_goal_sub = nh.subscribe("/frontier_goal", 1, frontierGoalCallback);
+  ros::Subscriber lantern_goal_sub = nh.subscribe("/num_lanterns", 1, num_lantern_callback);
+
+  ros::Publisher traj_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/trajectory", 10);
 
   // Define waypoints.
   geometry_msgs::PoseStamped cave_entrance_goal;
@@ -74,6 +93,15 @@ int main(int argc, char** argv) {
   double cave_threshold = 5.0;  // Increased threshold so the state transitions when within 5 m of the cave entrance.
   double landing_threshold = 0.5;
   double explore_duration = 100000.0; // For now, exploration runs indefinitely (or until manually terminated).
+
+  
+//   void num_lantern_callback(const std_msgs::Int16::ConstPtr& num) {
+//     try {
+//         num_of_lantern = std::stoi(num->data);
+//     } catch (const std::exception& e) {
+//         ROS_ERROR("Failed to convert num_lantern to int: %s", e.what());
+//     }
+// }
 
   while (ros::ok()) {
     if ((ros::Time::now() - last_transition_time).toSec() >= 3.0) {
@@ -121,26 +149,54 @@ int main(int argc, char** argv) {
         case EXPLORE: {
             ROS_INFO("State: EXPLORE");
             mode_msg.data = "EXPLORE";
-            stm_mode_pub.publish(mode_msg);
-            // trajectory_msgs::MultiDOFJointTrajectoryPoint explore_state;
-            // explore_state.transforms.resize(1);
-            // If a frontier goal has been received, use it.
-            // if (frontier_goal_received) {
-            //   explore_state.transforms[0].translation.x = latest_frontier_goal.point.x;
-            //   explore_state.transforms[0].translation.y = latest_frontier_goal.point.y;
-            //   explore_state.transforms[0].translation.z = latest_frontier_goal.point.z;
-            //   // For now, set a default orientation.
-            //   explore_state.transforms[0].rotation.w = 1.0;
-            // } else if (!frontier_goal_received){
+            // if (frontier_goal_received){
+            //    stm_mode_pub.publish(mode_msg);
 
-            //   ROS_INFO("Landing.");
-            //   current_state = LAND;
+            // //   ROS_INFO("Landing.");
+            // //   current_state = LAND;
             // }
+            // //else if(!frontier_goal_received && tot_num_lanters_detected==5){
+            // if (!frontier_goal_received && num_of_lantern.data == 5) {
+            //     ROS_INFO("Cave entrance reached.");
+            //     current_state = LAND;
+            // }
+
           } break;
         case LAND: {
             ROS_INFO("State: LAND");
             mode_msg.data = "LAND";
             stm_mode_pub.publish(mode_msg);
+            // trajectory_msgs::MultiDOFJointTrajectoryPoint land_traj;
+            // land_traj.transforms.resize(1);
+            // land_traj.velocities.resize(1);
+            // land_traj.accelerations.resize(1);
+            // land_traj.transforms[0].translation.x = state.pose.pose.position.x;
+            // land_traj.transforms[0].translation.y = state.pose.pose.position.y;
+            // land_traj.transforms[0].translation.z = state.pose.pose.position.z-1;
+
+            // land_traj.transforms[0].translation.z = land_traj.transforms[0].translation.z-1;
+
+            // land_traj.transforms[0].rotation.x = 0;
+            // land_traj.transforms[0].rotation.y = 0;
+            // land_traj.transforms[0].rotation.z = 0;
+            // land_traj.transforms[0].rotation.w = 1;
+
+            // land_traj.velocities[0].linear.x = 0;
+            // land_traj.velocities[0].linear.y = 0;
+            // land_traj.velocities[0].linear.z = 0;
+            // land_traj.velocities[0].angular.x = 0;
+            // land_traj.velocities[0].angular.y = 0;
+            // land_traj.velocities[0].angular.z = 0;
+
+            // land_traj.accelerations[0].linear.x = 0;
+            // land_traj.accelerations[0].linear.y = 0;
+            // land_traj.accelerations[0].linear.z = 0;
+            // land_traj.accelerations[0].angular.x = 0;
+            // land_traj.accelerations[0].angular.y = 0;
+            // land_traj.accelerations[0].angular.z = 0;
+            
+            // traj_pub.publish(land_traj);     
+
           } break;
       } // end switch
       last_transition_time = ros::Time::now();

@@ -13,6 +13,7 @@
 #include <tf2_ros/buffer.h>
 #include <cmath>
 #include <sstream>
+#include <std_msgs/Int16.h>
 
 class LanternDetector {
 public:
@@ -42,6 +43,9 @@ public:
         // 2) Human-readable text
         lantern_text_pub_ = nh_.advertise<std_msgs::String>(
             "/detected_lanterns", 10);
+        
+        num_lantern_pub_ = nh_.advertise<std_msgs::Int16>(
+            "/num_lanterns", 10);
 
         // Adjust the distance threshold if needed
         distance_threshold_ = 220; // meters
@@ -57,7 +61,7 @@ private:
 
     // Publishers
     ros::Publisher lantern_pub_;
-    ros::Publisher lantern_text_pub_;
+    ros::Publisher lantern_text_pub_,num_lantern_pub_;
 
     // Depth image, camera info
     cv::Mat depth_image_;
@@ -117,6 +121,8 @@ private:
             if (isNewLantern(world_point.point)) {
                 // It's a new lantern
                 lantern_count_++;
+                std_msgs::Int16 msg;
+                msg.data = lantern_count_;
                 known_lantern_positions_.push_back(world_point.point);
 
                 float x = world_point.point.x;
@@ -140,6 +146,7 @@ private:
                    << x << ", " << y << ", " << z << ")";
                 text_msg.data = ss.str();
                 lantern_text_pub_.publish(text_msg);
+                num_lantern_pub_.publish(msg);
             }
         }
 
