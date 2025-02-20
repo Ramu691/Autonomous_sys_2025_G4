@@ -114,11 +114,12 @@ int main(int argc, char** argv) {
                 
                 ROS_INFO("Transitioning from IDLE to TAKEOFF");
                 current_state=TAKEOFF;
+                ROS_INFO("State: TAKEOFF");
                                       
           } break;
 
         case TAKEOFF: {
-            ROS_INFO("State: TAKEOFF");
+            //ROS_INFO("State: TAKEOFF");
             mode_msg.data = "TAKEOFF";
             stm_mode_pub.publish(mode_msg);
             if(sqrt(pow(current_pose.pose.position.x - take_off.pose.position.x, 2) + 
@@ -126,12 +127,13 @@ int main(int argc, char** argv) {
                     pow(current_pose.pose.position.z - take_off.pose.position.z, 2)) < takeoff_threshold ) {
               ROS_INFO("Takeoff complete");
               current_state = NAVIGATE;
+              ROS_INFO("State: NAVIGATE");
               //state_entry_time = ros::Time::now();
             }
           } break;
 
         case NAVIGATE: {
-            ROS_INFO("State: NAVIGATE");
+            //ROS_INFO("State: NAVIGATE");
             mode_msg.data = "NAVIGATE";
             stm_mode_pub.publish(mode_msg);
             double dx = current_pose.pose.position.x - cave_entrance_goal.pose.position.x;
@@ -142,13 +144,15 @@ int main(int argc, char** argv) {
             if (dist < cave_threshold) {
               ROS_INFO("Cave entrance reached.");
               current_state = EXPLORE;
+              ROS_INFO("State: EXPLORE");
               
             }
           } break;
 
         case EXPLORE: {
-            ROS_INFO("State: EXPLORE");
+            //ROS_INFO("State: EXPLORE");
             mode_msg.data = "EXPLORE";
+            stm_mode_pub.publish(mode_msg);
             // if (frontier_goal_received){
             //    stm_mode_pub.publish(mode_msg);
 
@@ -156,46 +160,47 @@ int main(int argc, char** argv) {
             // //   current_state = LAND;
             // }
             // //else if(!frontier_goal_received && tot_num_lanters_detected==5){
-            // if (!frontier_goal_received && num_of_lantern.data == 5) {
-            //     ROS_INFO("Cave entrance reached.");
-            //     current_state = LAND;
-            // }
+            if (!frontier_goal_received && num_of_lantern.data == 5) {
+                ROS_INFO("Landing.");
+                current_state = LAND;
+                ROS_INFO("State: LAND");
+            }
 
           } break;
         case LAND: {
             ROS_INFO("State: LAND");
             mode_msg.data = "LAND";
             stm_mode_pub.publish(mode_msg);
-            // trajectory_msgs::MultiDOFJointTrajectoryPoint land_traj;
-            // land_traj.transforms.resize(1);
-            // land_traj.velocities.resize(1);
-            // land_traj.accelerations.resize(1);
-            // land_traj.transforms[0].translation.x = state.pose.pose.position.x;
-            // land_traj.transforms[0].translation.y = state.pose.pose.position.y;
-            // land_traj.transforms[0].translation.z = state.pose.pose.position.z-1;
+            trajectory_msgs::MultiDOFJointTrajectoryPoint land_traj;
+            land_traj.transforms.resize(1);
+            land_traj.velocities.resize(1);
+            land_traj.accelerations.resize(1);
+            land_traj.transforms[0].translation.x = current_pose.pose.position.x;
+            land_traj.transforms[0].translation.y = current_pose.pose.position.y;
+            land_traj.transforms[0].translation.z = current_pose.pose.position.z-1;
 
-            // land_traj.transforms[0].translation.z = land_traj.transforms[0].translation.z-1;
+            land_traj.transforms[0].translation.z = land_traj.transforms[0].translation.z-1;
 
-            // land_traj.transforms[0].rotation.x = 0;
-            // land_traj.transforms[0].rotation.y = 0;
-            // land_traj.transforms[0].rotation.z = 0;
-            // land_traj.transforms[0].rotation.w = 1;
+            land_traj.transforms[0].rotation.x = 0;
+            land_traj.transforms[0].rotation.y = 0;
+            land_traj.transforms[0].rotation.z = 0;
+            land_traj.transforms[0].rotation.w = 1;
 
-            // land_traj.velocities[0].linear.x = 0;
-            // land_traj.velocities[0].linear.y = 0;
-            // land_traj.velocities[0].linear.z = 0;
-            // land_traj.velocities[0].angular.x = 0;
-            // land_traj.velocities[0].angular.y = 0;
-            // land_traj.velocities[0].angular.z = 0;
+            land_traj.velocities[0].linear.x = 0;
+            land_traj.velocities[0].linear.y = 0;
+            land_traj.velocities[0].linear.z = 0;
+            land_traj.velocities[0].angular.x = 0;
+            land_traj.velocities[0].angular.y = 0;
+            land_traj.velocities[0].angular.z = 0;
 
-            // land_traj.accelerations[0].linear.x = 0;
-            // land_traj.accelerations[0].linear.y = 0;
-            // land_traj.accelerations[0].linear.z = 0;
-            // land_traj.accelerations[0].angular.x = 0;
-            // land_traj.accelerations[0].angular.y = 0;
-            // land_traj.accelerations[0].angular.z = 0;
+            land_traj.accelerations[0].linear.x = 0;
+            land_traj.accelerations[0].linear.y = 0;
+            land_traj.accelerations[0].linear.z = 0;
+            land_traj.accelerations[0].angular.x = 0;
+            land_traj.accelerations[0].angular.y = 0;
+            land_traj.accelerations[0].angular.z = 0;
             
-            // traj_pub.publish(land_traj);     
+            traj_pub.publish(land_traj);     
 
           } break;
       } // end switch
