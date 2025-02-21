@@ -133,7 +133,7 @@ public:
     {
         if (start_received_ && goal_received_ && octomap_received_ && stm_state_ == "EXPLORE")
         {
-            ROS_INFO("Attempting to plan a path...");
+            //ROS_INFO("Attempting to plan a path...");
             planPath();
         }
     }
@@ -161,7 +161,7 @@ public:
         if (start_pose_.pose.position.x < x_min || start_pose_.pose.position.x > x_max ||
             start_pose_.pose.position.y < y_min || start_pose_.pose.position.y > y_max ||
             start_pose_.pose.position.z < z_min || start_pose_.pose.position.z > z_max ) {
-            ROS_ERROR("Start position is out of bounds!");
+            //ROS_ERROR("Start position is out of bounds!");
             return false;
         }
 
@@ -225,8 +225,7 @@ public:
 
         if (solved)
         {
-            ROS_INFO("Path found!");
-            // ss.simplifySolution();
+            //ROS_INFO("Path found!");
 
             og::PathGeometric path = ss.getSolutionPath();
             nav_msgs::Path ros_path;
@@ -246,7 +245,7 @@ public:
         }
         else
         {
-            ROS_WARN("No path found.");
+            //ROS_WARN("No path found.");
         }
         return solved;
     }

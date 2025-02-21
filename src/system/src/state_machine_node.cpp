@@ -12,6 +12,11 @@
 // Include the custom frontier message
 #include <custom_msgs/FrontierGoalMsg.h>
 #include <std_msgs/Int16.h>
+#include <geometry_msgs/Point.h> 
+
+#include <custom_msgs/FrontierGoalMsg.h>
+
+
 
 
 // Define mission states.
@@ -20,9 +25,12 @@ enum RobotState { IDLE, TAKEOFF, NAVIGATE, EXPLORE, LAND };
 // Global mission state and current feedback.
 RobotState current_state = IDLE;
 geometry_msgs::PoseStamped current_pose;
+geometry_msgs::Point latest_frontier_point;
 
 std_msgs::Int16 num_of_lantern;
-
+// Counter to track consecutive condition validations
+int frontier_check_counter = 0;
+const int REQUIRED_COUNT = 20;  // Number of consecutive times condition must be true
 
 // Callback to update current state from /current_state_est.
 void currentStateCallback(const nav_msgs::Odometry::ConstPtr& msg) {
@@ -39,6 +47,9 @@ bool frontier_goal_received = false;
 void frontierGoalCallback(const custom_msgs::FrontierGoalMsg::ConstPtr& msg) {
   latest_frontier_goal = *msg;
   frontier_goal_received = true;
+  latest_frontier_point.x = msg->point.x;
+  latest_frontier_point.y = msg->point.y;
+  latest_frontier_point.z = msg->point.z;
   // ROS_INFO("Frontier goal received: x=%f, y=%f, z=%f",
   //         msg->point.x, msg->point.y, msg->point.z);
 }
@@ -59,6 +70,7 @@ int main(int argc, char** argv) {
   ros::init(argc, argv, "state_machine_node");
   ros::NodeHandle nh;
   num_of_lantern.data=0;
+  
   ros::Publisher desired_state_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 1, true);
   ros::Publisher stm_mode_pub = nh.advertise<std_msgs::String>("/stm_mode", 10);
 
@@ -86,10 +98,13 @@ int main(int argc, char** argv) {
   ros::Rate rate(5);
   ros::Time last_transition_time = ros::Time::now();
   ros::Time state_entry_time = ros::Time::now();
+  ros::Time last_reset_time;  // Time tracking for counter reset
+  const double RESET_INTERVAL = 50.0;  // Reset every 5 seconds
 
   // Transition parameters.
   double takeoff_altitude = 15.0;
   double takeoff_threshold = 2.0;
+  double frontier_threshold =1.3;
   double cave_threshold = 5.0;  // Increased threshold so the state transitions when within 5 m of the cave entrance.
   double landing_threshold = 0.5;
   double explore_duration = 100000.0; // For now, exploration runs indefinitely (or until manually terminated).
@@ -153,15 +168,32 @@ int main(int argc, char** argv) {
             //ROS_INFO("State: EXPLORE");
             mode_msg.data = "EXPLORE";
             stm_mode_pub.publish(mode_msg);
-            // if (frontier_goal_received){
-            //    stm_mode_pub.publish(mode_msg);
-
+            
             // //   ROS_INFO("Landing.");
             // //   current_state = LAND;
             // }
             // //else if(!frontier_goal_received && tot_num_lanters_detected==5){
             // if (!frontier_goal_received && num_of_lantern.data == 5) {
-            if ( num_of_lantern.data == 5) {
+            //ros::Time current_time = ros::Time::now();  // Get the current time
+            // if ((current_time - last_reset_time).toSec() >= RESET_INTERVAL) {
+            //     frontier_check_counter = 0;
+            //     last_reset_time = current_time;  // Update reset time
+            //     ROS_INFO("Counter reset after 5 seconds.");
+            // }
+            if(sqrt(pow(current_pose.pose.position.x - latest_frontier_point.x, 2) + 
+                    pow(current_pose.pose.position.y - latest_frontier_point.y, 2) + 
+                    pow(current_pose.pose.position.z - latest_frontier_point.z, 2)) <= frontier_threshold ){
+                    frontier_check_counter++;  // Increment counter
+
+                    if (frontier_check_counter >= REQUIRED_COUNT) {
+                          frontier_goal_received = false;
+                          ROS_INFO("Frontier goal disabled after 10 consecutive checks.");
+                      }
+                      
+                    }
+            
+            // if (!frontier_goal_received && num_of_lantern.data == 5 ) {
+            if (!frontier_goal_received && num_of_lantern.data == 5 ) {
                 ROS_INFO("Landing.");
                 current_state = LAND;
                 ROS_INFO("State: LAND");

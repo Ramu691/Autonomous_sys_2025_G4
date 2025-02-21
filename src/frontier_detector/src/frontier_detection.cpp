@@ -72,7 +72,7 @@ public:
 		timer = nh.createTimer(ros::Duration(1.0/publish_goal_frequency), &FrontierDetector::publish_goal,this);
         frontier_publisher = nh.advertise<visualization_msgs::MarkerArray>("/frontiers", 1);
         Curr_Pose_Subscriber = nh.subscribe("/pose_est",1,&FrontierDetector::Current_position,this);
-        goal_publisher = nh.advertise<geometry_msgs::PoseStamped>("/goal", 1);
+        //goal_publisher = nh.advertise<geometry_msgs::PoseStamped>("/goal", 1);
         frontier_goal_publisher = nh.advertise<custom_msgs::FrontierGoalMsg>("/frontier_goal", 1);
         state_subscriber = nh.subscribe("/stm_mode", 1, &FrontierDetector::onStateStm, this);
 		check_path_client = nh.serviceClient<custom_msgs::CheckPath>("check_path");
@@ -213,7 +213,7 @@ public:
 		goal_point.x = goal_message.pose.position.x;
 		goal_point.y = goal_message.pose.position.y;
 		goal_point.z = goal_message.pose.position.z;
-		goal_publisher.publish(goal_message);
+		//goal_publisher.publish(goal_message);
 		frontier_goal_publisher.publish(frontier_goal_message);
 		ROS_INFO(" publishing goal ");
 	}
