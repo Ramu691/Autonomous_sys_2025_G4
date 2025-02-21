@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
   ros::Subscriber frontier_goal_sub = nh.subscribe("/frontier_goal", 1, frontierGoalCallback);
   ros::Subscriber lantern_goal_sub = nh.subscribe("/num_lanterns", 1, num_lantern_callback);
 
-  ros::Publisher traj_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/trajectory", 10);
+  ros::Publisher traj_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 10);
 
   // Define waypoints.
   geometry_msgs::PoseStamped cave_entrance_goal;
@@ -160,7 +160,8 @@ int main(int argc, char** argv) {
             // //   current_state = LAND;
             // }
             // //else if(!frontier_goal_received && tot_num_lanters_detected==5){
-            if (!frontier_goal_received && num_of_lantern.data == 5) {
+            // if (!frontier_goal_received && num_of_lantern.data == 5) {
+            if ( num_of_lantern.data == 5) {
                 ROS_INFO("Landing.");
                 current_state = LAND;
                 ROS_INFO("State: LAND");
@@ -177,9 +178,9 @@ int main(int argc, char** argv) {
             land_traj.accelerations.resize(1);
             land_traj.transforms[0].translation.x = current_pose.pose.position.x;
             land_traj.transforms[0].translation.y = current_pose.pose.position.y;
-            land_traj.transforms[0].translation.z = current_pose.pose.position.z-1;
+            land_traj.transforms[0].translation.z = current_pose.pose.position.z;
 
-            land_traj.transforms[0].translation.z = land_traj.transforms[0].translation.z-1;
+            land_traj.transforms[0].translation.z = land_traj.transforms[0].translation.z;
 
             land_traj.transforms[0].rotation.x = 0;
             land_traj.transforms[0].rotation.y = 0;
@@ -188,7 +189,7 @@ int main(int argc, char** argv) {
 
             land_traj.velocities[0].linear.x = 0;
             land_traj.velocities[0].linear.y = 0;
-            land_traj.velocities[0].linear.z = 0;
+            land_traj.velocities[0].linear.z = -5;
             land_traj.velocities[0].angular.x = 0;
             land_traj.velocities[0].angular.y = 0;
             land_traj.velocities[0].angular.z = 0;
@@ -201,8 +202,9 @@ int main(int argc, char** argv) {
             land_traj.accelerations[0].angular.z = 0;
             
             traj_pub.publish(land_traj);     
-
+            // ros::shutdown();
           } break;
+          // ros::shutdown();
       } // end switch
       last_transition_time = ros::Time::now();
     } // end if

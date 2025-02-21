@@ -10,7 +10,7 @@
 #include <Eigen/Dense>
 #include <cmath>
 #include <vector>
-
+#include <std_msgs/String.h>
 // For converting yaw->quaternion
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h> // for toMsg()
@@ -107,6 +107,7 @@ public:
 
         path_sub_ = nh_.subscribe("/rrt_path", 1, &TrajGen::pathCallback, this);
         traj_pub_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/trajectory", 10);
+        state_subscriber_ = nh_.subscribe("/stm_mode", 1, &TrajGen::onStateStm, this);
 
         timer_ = nh_.createTimer(
             ros::Duration(1.0/publish_rate_),
@@ -119,9 +120,10 @@ public:
 
 private:
     ros::NodeHandle nh_;
-    ros::Subscriber path_sub_;
+    ros::Subscriber path_sub_, state_subscriber_;
     ros::Publisher  traj_pub_;
     ros::Timer      timer_;
+    std::string stm_state_ ;
 
     double publish_rate_;
 
@@ -197,6 +199,10 @@ private:
             ROS_INFO("TrajGen: Mid-flight ignoring new path (Dist=%.1f not better than old=%.1f).",
                      new_path_dist, old_path_dist_remaining);
         }
+    }
+
+    void onStateStm(const std_msgs::String& cur_state){
+      stm_state_ = cur_state.data;
     }
 
     /**
@@ -327,6 +333,10 @@ private:
         msg.accelerations[0].linear.z = az;
 
         traj_pub_.publish(msg);
+
+        if (stm_state_=="LAND"){
+            ros::shutdown();
+        }
 
         ROS_INFO_THROTTLE(1.0,
             "TrajGen: seg=%lu t=%.2f/%.2f -> pos(%.2f,%.2f,%.2f) vel(%.2f,%.2f,%.2f) yaw=%.1f deg",
