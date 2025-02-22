@@ -1,10 +1,12 @@
 #include <ros/ros.h>
+#include <nav_msgs/Odometry.h>             // For drone position
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
-#include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/PointStamped.h>
 #include <std_msgs/Float32MultiArray.h>
-#include <std_msgs/String.h>       // <-- for text publishing
+#include <std_msgs/String.h>
+#include <std_msgs/Int16.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -12,244 +14,301 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <cmath>
+#include <vector>
+#include <string>
 #include <sstream>
-#include <std_msgs/Int16.h>
 
 class LanternDetector {
 public:
     LanternDetector() 
-      : tf_buffer_(),
-        tf_listener_(tf_buffer_),
-        lantern_count_(0)
+      : tf_buffer_(), tf_listener_(tf_buffer_), lantern_count_(0)
     {
-        // ROS Subscribers
+        // 1) Drone odometry: for position in "world" frame
+        odom_sub_ = nh_.subscribe(
+            "/current_state_est", 1,
+            &LanternDetector::odomCallback, this);
+
+        // 2) Semantic camera
         semantic_sub_ = nh_.subscribe(
             "/unity_ros/Quadrotor/Sensors/SemanticCamera/image_raw", 10,
             &LanternDetector::semanticCallback, this);
-        
+
+        // 3) Depth image
         depth_sub_ = nh_.subscribe(
-            "/realsense/depth/image", 10, 
+            "/realsense/depth/image", 10,
             &LanternDetector::depthCallback, this);
-        
+
+        // 4) Camera intrinsics
         camera_info_sub_ = nh_.subscribe(
             "/realsense/depth/camera_info", 10,
             &LanternDetector::cameraInfoCallback, this);
 
-        // ROS Publishers
-        // 1) Numeric positions
-        lantern_pub_ = nh_.advertise<std_msgs::Float32MultiArray>(
+        // Publishers
+        lantern_positions_pub_ = nh_.advertise<std_msgs::Float32MultiArray>(
             "/lantern_positions", 10);
 
-        // 2) Human-readable text
         lantern_text_pub_ = nh_.advertise<std_msgs::String>(
             "/detected_lanterns", 10);
-        
-        num_lantern_pub_ = nh_.advertise<std_msgs::Int16>(
+
+        lantern_count_pub_ = nh_.advertise<std_msgs::Int16>(
             "/num_lanterns", 10);
 
-        // Adjust the distance threshold if needed
-        distance_threshold_ = 220; // meters
+        // Distances
+        distance_threshold_ = 100.0;  // how close is "the same lantern"
+        drone_lantern_dist_ = 30.0;   // must be <= 10m to count
     }
 
 private:
     ros::NodeHandle nh_;
 
     // Subscribers
+    ros::Subscriber odom_sub_;
     ros::Subscriber semantic_sub_;
     ros::Subscriber depth_sub_;
     ros::Subscriber camera_info_sub_;
 
     // Publishers
-    ros::Publisher lantern_pub_;
-    ros::Publisher lantern_text_pub_,num_lantern_pub_;
+    ros::Publisher lantern_positions_pub_;
+    ros::Publisher lantern_text_pub_;
+    ros::Publisher lantern_count_pub_;
 
-    // Depth image, camera info
-    cv::Mat depth_image_;
-    sensor_msgs::CameraInfo camera_info_;
-
-    // TF for transforming points from "camera" frame to "world" frame
+    // TF
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
 
-    // Track known lantern positions (in world frame)
+    // Depth image + camera info
+    cv::Mat depth_image_;
+    sensor_msgs::CameraInfo camera_info_;
+
+    // Known lantern positions + count
     std::vector<geometry_msgs::Point> known_lantern_positions_;
-    int lantern_count_;                // How many unique lanterns so far
-    double distance_threshold_;        // to decide if a new detection is "new"
-    std_msgs::Float32MultiArray lantern_positions;
+    int lantern_count_;
+
+    // Distance thresholds
+    double distance_threshold_;  // for "new" lantern vs known
+    double drone_lantern_dist_;  // skip if > 10m from drone
+
+    // Drone position in "world"
+    geometry_msgs::Point drone_position_;
 
 private:
+    /**
+     * @brief Drone odometry callback
+     */
+    void odomCallback(const nav_msgs::Odometry::ConstPtr &odom_msg)
+    {
+        // The pose is in "world" frame
+        drone_position_ = odom_msg->pose.pose.position;
+    }
 
     /**
-     * @brief  Callback to receive the semantic image.
-     *         We find connected components of nonzero pixels,
-     *         convert each to 3D, and check if it's a new lantern.
+     * @brief Semantic camera callback: 
+     *        find lantern centroids, convert to 3D in camera->world, skip if depth=0, etc.
      */
-    void semanticCallback(const sensor_msgs::ImageConstPtr& semantic_msg) {
-        // Convert to OpenCV MONO8
+    void semanticCallback(const sensor_msgs::ImageConstPtr &semantic_msg)
+    {
+        // Convert to CV MONO8
         cv_bridge::CvImagePtr cv_ptr;
         try {
             cv_ptr = cv_bridge::toCvCopy(semantic_msg, sensor_msgs::image_encodings::MONO8);
-        } catch (cv_bridge::Exception& e) {
-            ROS_ERROR("cv_bridge exception: %s", e.what());
+        } catch (cv_bridge::Exception &e) {
+            ROS_ERROR("Semantic cv_bridge exception: %s", e.what());
             return;
         }
 
-        cv::Mat semantic_image = cv_ptr->image;
-
-        // Quickly check if we have no nonzero pixels
-        if (cv::countNonZero(semantic_image) == 0) {
-            ROS_INFO("No lanterns detected.");
+        cv::Mat semantic_img = cv_ptr->image;
+        if (cv::countNonZero(semantic_img) == 0) {
+            
             return;
         }
 
-        // Find connected components (each likely one lantern)
+        // Connected components => separate lanterns
         cv::Mat labels, stats, centroids;
         int num_components = cv::connectedComponentsWithStats(
-                                semantic_image, labels, stats, centroids, 8, CV_32S);
+            semantic_img, labels, stats, centroids, 8, CV_32S);
 
-        // Prepare a numeric array of newly-discovered lantern positions
-        
+        // Collect newly discovered lantern coords for publishing
+        std_msgs::Float32MultiArray new_lanterns;
 
-        // label_idx=0 is background
         for (int label_idx = 1; label_idx < num_components; ++label_idx) {
             double cx = centroids.at<double>(label_idx, 0);
             double cy = centroids.at<double>(label_idx, 1);
 
-            geometry_msgs::Point point_3d = pixelTo3D((int)cx, (int)cy);
-            geometry_msgs::PointStamped world_point = transformToWorldFrame(point_3d);
+            // Pixel coords
+            int px = static_cast<int>(cx);
+            int py = static_cast<int>(cy);
 
-            // Check if we have seen this lantern before
+            // Convert pixel -> camera coords
+            geometry_msgs::Point cam_point = pixelTo3D(px, py);
+
+            // If depth=0 => skip
+            if (!depth_image_.empty() &&
+                px >= 0 && px < depth_image_.cols &&
+                py >= 0 && py < depth_image_.rows)
+            {
+                uint16_t depth_mm = depth_image_.at<uint16_t>(py, px);
+                if (depth_mm == 0) {
+                    ROS_INFO("Detected lantern pixel but depth=0 => skipping.");
+                    continue;  // skip this detection
+                }
+
+                // Debug info
+                ROS_INFO("Camera coords=(%.3f,%.3f,%.3f), depth=%u mm",
+                         cam_point.x, cam_point.y, cam_point.z, depth_mm);
+            }
+
+            // Transform camera->world
+            geometry_msgs::PointStamped world_point = transformToWorldFrame(cam_point);
+
+            // dist from drone
+            double dist_drone_lantern = distanceBetween(drone_position_, world_point.point);
+            ROS_INFO("Distance between drone and Lantern is %.2f ", dist_drone_lantern);
+            // If > 10m => skip
+            if (dist_drone_lantern > drone_lantern_dist_) {
+                continue;
+            }
+
+            // Check if brand-new
             if (isNewLantern(world_point.point)) {
-                // It's a new lantern
                 lantern_count_++;
-                std_msgs::Int16 msg;
-                msg.data = lantern_count_;
                 known_lantern_positions_.push_back(world_point.point);
 
-                float x = world_point.point.x;
-                float y = world_point.point.y;
-                float z = world_point.point.z;
+                // Log
+                ROS_INFO("Lantern %d detected at (%.2f,%.2f,%.2f), dist=%.2f m",
+                         lantern_count_,
+                         world_point.point.x,
+                         world_point.point.y,
+                         world_point.point.z,
+                         dist_drone_lantern);
 
-                // 1) Add numeric data to the float array
-                lantern_positions.data.push_back(x);
-                lantern_positions.data.push_back(y);
-                lantern_positions.data.push_back(z);
+                // Publish to new_lanterns
+                new_lanterns.data.push_back(world_point.point.x);
+                new_lanterns.data.push_back(world_point.point.y);
+                new_lanterns.data.push_back(world_point.point.z);
 
-                // 2) Print to console
-                ROS_INFO("Lantern %d is detected at (%.2f, %.2f, %.2f)", 
-                         lantern_count_, x, y, z);
-
-                // 3) Publish a human-readable text message
+                // Also publish text
                 std_msgs::String text_msg;
                 std::stringstream ss;
-                ss << "Lantern " << lantern_count_ 
-                   << " is detected position is (" 
-                   << x << ", " << y << ", " << z << ")";
+                ss << "Lantern " << lantern_count_
+                   << " at (" << world_point.point.x
+                   << ", " << world_point.point.y
+                   << ", " << world_point.point.z
+                   << "), droneDist=" << dist_drone_lantern << "m";
                 text_msg.data = ss.str();
                 lantern_text_pub_.publish(text_msg);
-                num_lantern_pub_.publish(msg);
-                //lantern_pub_.publish(known_lantern_positions_);               
+
+                // Publish updated count
+                std_msgs::Int16 count_msg;
+                count_msg.data = lantern_count_;
+                lantern_count_pub_.publish(count_msg);
             }
         }
 
-        // Publish any newly discovered lantern positions
-        if (!lantern_positions.data.empty()) {
-            lantern_pub_.publish(lantern_positions);
+        // Publish any new lantern positions
+        if (!new_lanterns.data.empty()) {
+            lantern_positions_pub_.publish(new_lanterns);
         }
     }
 
     /**
-     * @brief Check if a 3D point in world frame is already known or not.
+     * @brief Convert (px,py) => 3D in camera frame
      */
-    bool isNewLantern(const geometry_msgs::Point& candidate) {
-        // Compare candidate to each known lantern position
-        for (const auto& known : known_lantern_positions_) {
-            double dx = known.x - candidate.x;
-            double dy = known.y - candidate.y;
-            double dz = known.z - candidate.z;
-            double dist = std::sqrt(dx*dx + dy*dy + dz*dz);
-
-            // If the new point is within distance_threshold_, 
-            // consider it the same lantern
-            if (dist < distance_threshold_) {
-                return false;
-            }
-        }
-        return true; // none were close enough, so it's new
-    }
-
-    /**
-     * @brief  Callback to receive the depth image.
-     */
-    void depthCallback(const sensor_msgs::ImageConstPtr& depth_msg) {
-        // Convert depth image (16UC1)
-        cv_bridge::CvImagePtr cv_ptr;
-        try {
-            cv_ptr = cv_bridge::toCvCopy(depth_msg, sensor_msgs::image_encodings::TYPE_16UC1);
-        } catch (cv_bridge::Exception& e) {
-            ROS_ERROR("cv_bridge exception: %s", e.what());
-            return;
-        }
-
-        depth_image_ = cv_ptr->image;
-    }
-
-    /**
-     * @brief  Callback to receive camera info (intrinsics).
-     */
-    void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& info_msg) {
-        camera_info_ = *info_msg;
-    }
-
-    /**
-     * @brief  Convert pixel (x,y) to 3D point in the camera frame, using
-     *         depth_image_ and camera_info_ intrinsics.
-     */
-    geometry_msgs::Point pixelTo3D(int x, int y) {
-        geometry_msgs::Point point;
-
-        // Check if we have valid depth and intrinsics
+    geometry_msgs::Point pixelTo3D(int px, int py)
+    {
+        geometry_msgs::Point pt;
         if (depth_image_.empty() || camera_info_.K.empty()) {
-            ROS_WARN("Depth image or camera info not available.");
-            return point;
+            ROS_WARN("Depth image or camera info not ready.");
+            return pt; // (0,0,0)
         }
 
-        // Depth is in mm (16-bit). Convert to meters
-        float depth = depth_image_.at<uint16_t>(y, x) * 0.001f;
+        uint16_t depth_raw = depth_image_.at<uint16_t>(py, px); // mm
+        float depth_m = depth_raw * 0.001f;
 
-        // Camera intrinsic parameters
         float fx = camera_info_.K[0];
         float fy = camera_info_.K[4];
         float cx = camera_info_.K[2];
         float cy = camera_info_.K[5];
 
-        // Convert pixel to 3D camera coords
-        point.x = (x - cx) * depth / fx;
-        point.y = (y - cy) * depth / fy;
-        point.z = depth;
-
-        return point;
+        pt.x = (px - cx) * depth_m / fx;
+        pt.y = (py - cy) * depth_m / fy;
+        pt.z = depth_m;
+        return pt;
     }
 
     /**
-     * @brief  Transform a geometry_msgs::Point from "camera" frame to "world".
+     * @brief Transform from "camera" to "world"
      */
-    geometry_msgs::PointStamped transformToWorldFrame(const geometry_msgs::Point& point) {
-        geometry_msgs::PointStamped camera_point, world_point;
-        camera_point.header.frame_id = "camera"; // or your actual camera frame
-        camera_point.point = point;
+    geometry_msgs::PointStamped transformToWorldFrame(const geometry_msgs::Point &cam_point)
+    {
+        geometry_msgs::PointStamped camera_pt, world_pt;
+        camera_pt.header.frame_id = "camera"; 
+        camera_pt.point = cam_point;
 
         try {
-            tf_buffer_.transform(camera_point, world_point, "world");
-        } catch (tf2::TransformException& ex) {
-            ROS_WARN("Transform error: %s", ex.what());
-            return camera_point; // fallback if transform fails
+            tf_buffer_.transform(camera_pt, world_pt, "world");
+            ROS_INFO("World coords=(%.3f,%.3f,%.3f)",
+                     world_pt.point.x,
+                     world_pt.point.y,
+                     world_pt.point.z);
+        } catch (tf2::TransformException &ex) {
+            ROS_WARN("transformToWorldFrame error: %s", ex.what());
+            return camera_pt; // fallback
         }
-        return world_point;
+        ROS_INFO("transformToWorldFrame worked");
+        return world_pt;
+    }
+
+    /**
+     * @brief Depth callback
+     */
+    void depthCallback(const sensor_msgs::ImageConstPtr &depth_msg)
+    {
+        try {
+            cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(
+                depth_msg, sensor_msgs::image_encodings::TYPE_16UC1);
+            depth_image_ = cv_ptr->image;
+        } catch (cv_bridge::Exception &e) {
+            ROS_ERROR("Depth cv_bridge exception: %s", e.what());
+        }
+    }
+
+    /**
+     * @brief Camera info callback
+     */
+    void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr &info_msg)
+    {
+        camera_info_ = *info_msg;
+    }
+
+    /**
+     * @brief Check if candidate is far from all known lanterns
+     */
+    bool isNewLantern(const geometry_msgs::Point &candidate)
+    {
+        for (const auto &known : known_lantern_positions_) {
+            double d = distanceBetween(known, candidate);
+            if (d < distance_threshold_) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @brief 3D distance
+     */
+    double distanceBetween(const geometry_msgs::Point &p1,
+                           const geometry_msgs::Point &p2)
+    {
+        double dx = p1.x - p2.x;
+        double dy = p1.y - p2.y;
+        double dz = p1.z - p2.z;
+        return std::sqrt(dx*dx + dy*dy + dz*dz);
     }
 };
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     ros::init(argc, argv, "lantern_detector");
     LanternDetector detector;
     ros::spin();
