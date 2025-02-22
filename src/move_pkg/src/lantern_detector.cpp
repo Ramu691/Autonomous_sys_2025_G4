@@ -90,6 +90,7 @@ private:
 
     // Drone position in "world"
     geometry_msgs::Point drone_position_;
+    std_msgs::Float32MultiArray new_lanterns;
 
 private:
     /**
@@ -128,7 +129,7 @@ private:
             semantic_img, labels, stats, centroids, 8, CV_32S);
 
         // Collect newly discovered lantern coords for publishing
-        std_msgs::Float32MultiArray new_lanterns;
+        
 
         for (int label_idx = 1; label_idx < num_components; ++label_idx) {
             double cx = centroids.at<double>(label_idx, 0);

@@ -6,7 +6,7 @@
 #include <octomap_msgs/conversions.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/geometric/SimpleSetup.h>
-#include <ompl/geometric/planners/rrt/RRTstar.h>
+#include <ompl/geometric/planners/rrt/RRT.h>
 #include <ompl/base/ScopedState.h>
 #include <std_msgs/String.h>
 #include <custom_msgs/FrontierGoalMsg.h>
@@ -212,7 +212,7 @@ public:
 
         ss.setStartAndGoalStates(start, goal);        
 
-        auto planner = std::make_shared<og::RRTstar>(ss.getSpaceInformation());
+        auto planner = std::make_shared<og::RRTs>(ss.getSpaceInformation());
         planner->setRange(step_size_factor_ * map_resolution_);
         planner->setGoalBias(bias_);
         ss.setPlanner(planner);
