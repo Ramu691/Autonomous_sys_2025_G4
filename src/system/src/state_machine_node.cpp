@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
 
                     if (frontier_check_counter >= REQUIRED_COUNT) {
                           frontier_goal_received = false;
-                          ROS_INFO("Frontier goal disabled after 10 consecutive checks.");
+                          ROS_INFO("Frontier goal disabled after 20 consecutive checks.");
                       }
                       
                     }
