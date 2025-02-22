@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
   ros::NodeHandle nh;
   num_of_lantern.data=0;
   
-  ros::Publisher desired_state_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 1, true);
+  //ros::Publisher desired_state_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 1, true);
   ros::Publisher stm_mode_pub = nh.advertise<std_msgs::String>("/stm_mode", 10);
 
   // Subscribers.
@@ -92,8 +92,8 @@ int main(int argc, char** argv) {
   geometry_msgs::PoseStamped take_off;
   take_off.pose.position.x = -38;
   take_off.pose.position.y = 10;
-  take_off.pose.position.z = 20;
-  take_off.pose.orientation.w = 1.0;
+  take_off.pose.position.z = 12;
+  // take_off.pose.orientation.w = 1.0;
 
   ros::Rate rate(5);
   ros::Time last_transition_time = ros::Time::now();
@@ -102,12 +102,10 @@ int main(int argc, char** argv) {
   const double RESET_INTERVAL = 50.0;  // Reset every 5 seconds
 
   // Transition parameters.
-  double takeoff_altitude = 15.0;
+  double takeoff_altitude = 7.0;
   double takeoff_threshold = 2.0;
-  double frontier_threshold =1.3;
+  double frontier_threshold =0.7;
   double cave_threshold = 5.0;  // Increased threshold so the state transitions when within 5 m of the cave entrance.
-  double landing_threshold = 0.5;
-  double explore_duration = 100000.0; // For now, exploration runs indefinitely (or until manually terminated).
 
   
 //   void num_lantern_callback(const std_msgs::Int16::ConstPtr& num) {
@@ -184,6 +182,7 @@ int main(int argc, char** argv) {
                     pow(current_pose.pose.position.y - latest_frontier_point.y, 2) + 
                     pow(current_pose.pose.position.z - latest_frontier_point.z, 2)) <= frontier_threshold ){
                     frontier_check_counter++;  // Increment counter
+                    ROS_INFO("frontier_check_counter: %.2d", frontier_check_counter);                    
 
                     if (frontier_check_counter >= REQUIRED_COUNT) {
                           frontier_goal_received = false;
@@ -201,7 +200,7 @@ int main(int argc, char** argv) {
 
           } break;
         case LAND: {
-            ROS_INFO("State: LAND");
+            //ROS_INFO("State: LAND");
             mode_msg.data = "LAND";
             stm_mode_pub.publish(mode_msg);
             trajectory_msgs::MultiDOFJointTrajectoryPoint land_traj;

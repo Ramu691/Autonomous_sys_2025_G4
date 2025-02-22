@@ -4,6 +4,8 @@
 #include <trajectory_msgs/MultiDOFJointTrajectoryPoint.h>
 #include <sstream>
 #include <iostream>
+#include <geometry_msgs/PoseStamped.h>
+#include <nav_msgs/Path.h>
 
 #include <math.h>
 
@@ -23,15 +25,16 @@ class Position{
 class UAVController{
     ros::NodeHandle nh;
     ros::Subscriber state_subscriber,position_subscriber;
-    ros::Publisher des_state_publisher, goal_publisher;
+    ros::Publisher des_state_publisher, path_publisher;
     double current_x, current_y, current_z;
     double initial_x, initial_y, initial_z;
     double delta_x, delta_y, delta_z;
     double gain;
     std::string statemachine_state;
     
-    Position waypoints[NUM_WP] = {Position(-38.0, 10.0, 20.0, 3.14),Position(-324.0, 10.0, 16.0, 3.14)};  
-
+    //Position waypoints[NUM_WP] = {Position(-38.0, 10.0, 20.0, 3.14),Position(-140.0, 10.0, 40.0, 3.14), Position(-324.0, 10.0, 16.0, 3.14)};  
+    //Position waypoints[NUM_WP] = {}; 
+    Position waypoints[NUM_WP] = {Position(-36.0, 10.0, 12.0, 3.14), Position(-324.0, 10.0, 16.0, 3.14)}; 
     int waypoint_index=-1;
     double time_start = -1;
     
@@ -40,6 +43,7 @@ class UAVController{
             state_subscriber = nh.subscribe("/stm_mode", 1, &UAVController::onStateStm, this);
             position_subscriber = nh.subscribe("/pose_est", 1, &UAVController::stateCallback, this);
             des_state_publisher = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("desired_state", 1);
+            path_publisher=nh.advertise<nav_msgs::Path>("rrt_path", 1);
             if (!ros::param::get("controller/gain", gain)) ROS_FATAL("Required parameter controller/gain was not found on parameter server");
         }
 
@@ -50,6 +54,7 @@ class UAVController{
                 waypoint_index = 0;
             } else if (statemachine_state == "NAVIGATE") {
                 waypoint_index = 1;
+                // publishPath();
             } else if (statemachine_state == "EXPLORE") {
                 ros::shutdown();
             }
@@ -57,6 +62,27 @@ class UAVController{
         
         double calculate_error(double desired_pose, double actual_pose){
             return gain * (desired_pose - actual_pose);
+        }
+        void publishPath() {
+            nav_msgs::Path path_msg;
+            path_msg.header.stamp = ros::Time::now();
+            path_msg.header.frame_id = "world"; 
+
+            for (int i = 1; i < NUM_WP; i++) { // Start from index 1
+                geometry_msgs::PoseStamped pose;
+                pose.header.frame_id = "world";
+                pose.header.stamp = ros::Time::now();
+
+                pose.pose.position.x = waypoints[i].x_position;
+                pose.pose.position.y = waypoints[i].y_position;
+                pose.pose.position.z = waypoints[i].z_position;
+                pose.pose.orientation.w = 1.0; // Default orientation
+
+                path_msg.poses.push_back(pose);
+            }
+
+            path_publisher.publish(path_msg);
+            ROS_INFO("Published full trajectory for NAVIGATE.");
         }
                 
         void stateCallback(const geometry_msgs::PoseStamped& current_pose){   
