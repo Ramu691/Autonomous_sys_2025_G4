@@ -236,7 +236,7 @@ private:
             double dist = std::sqrt(dx*dx + dy*dy + dz*dz);
 
             // simple time rule
-            double Tseg = std::max(1.0, dist * 0.3);
+            double Tseg = std::max(1.0, dist * 0.15);
 
             Eigen::VectorXd cx = computeSegmentCoeffs(startP.x, endP.x, Tseg);
             Eigen::VectorXd cy = computeSegmentCoeffs(startP.y, endP.y, Tseg);

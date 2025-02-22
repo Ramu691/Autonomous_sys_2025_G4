@@ -15,7 +15,8 @@
 #include <geometry_msgs/Point.h> 
 
 #include <custom_msgs/FrontierGoalMsg.h>
-
+#include <std_msgs/Float32MultiArray.h>
+#include <vector>
 
 
 
@@ -26,6 +27,7 @@ enum RobotState { IDLE, TAKEOFF, NAVIGATE, EXPLORE, LAND };
 RobotState current_state = IDLE;
 geometry_msgs::PoseStamped current_pose;
 geometry_msgs::Point latest_frontier_point;
+std::vector<std::vector<float>> stored_lantern_positions;
 
 std_msgs::Int16 num_of_lantern;
 // Counter to track consecutive condition validations
@@ -54,6 +56,32 @@ void frontierGoalCallback(const custom_msgs::FrontierGoalMsg::ConstPtr& msg) {
   //         msg->point.x, msg->point.y, msg->point.z);
 }
 
+// Function to store the lantern positions for further use
+void updateLanternPositions(const std_msgs::Float32MultiArray::ConstPtr& msg) {
+    // Ensure the data size is a multiple of 3 (x, y, z for each lantern)
+    if (msg->data.size() % 3 == 0) {
+        // Clear the existing data
+        stored_lantern_positions.clear();
+
+        // Store positions as groups of 3 (x, y, z)
+        for (size_t i = 0; i < msg->data.size(); i += 3) {
+            std::vector<float> lantern = {msg->data[i], msg->data[i + 1], msg->data[i + 2]};
+            stored_lantern_positions.push_back(lantern);
+        }
+
+        // Print the updated stored positions
+        // ROS_INFO("Stored Lantern Positions:");
+        // if(current_state == LAND){
+        //   for (size_t i = 0; i < stored_lantern_positions.size(); ++i) {
+        //       const auto& lantern = stored_lantern_positions[i];
+        //       ROS_INFO("Lantern %zu: x: %.2f, y: %.2f, z: %.2f", i + 1, lantern[0], lantern[1], lantern[2]);
+        //   }
+        // }
+    } else {
+        ROS_WARN("Received data size is not a multiple of 3. Ignoring.");
+    }
+}
+
 // void num_lantern_callback(const std_msgs::String::ConstPtr& num) {
 //     try {
 //         num_of_lantern = std::stoi(num->data);
@@ -65,6 +93,30 @@ void num_lantern_callback(const std_msgs::Int16::ConstPtr& msg) {
         num_of_lantern.data = msg->data;  
         //ROS_INFO("Received number of lanterns: %d", num_of_lantern.data);       
 }
+
+void printLanternCoordinates(const std_msgs::Float32MultiArray::ConstPtr& msg) {
+    int data_length = msg->data.size();
+    if (current_state == LAND){
+
+    // Check if the data length is a multiple of 3 (as each lantern has 3 coordinates)
+      if (data_length % 3 != 0 ) {
+          ROS_ERROR("Received data size is not a multiple of 3.");
+          return;
+      }
+
+      // Loop through the data and print the coordinates (x, y, z)
+      int num_lanterns = data_length / 3;
+      for (int i = 0; i < num_lanterns; ++i) {
+          int x_idx = i * 3;
+          int y_idx = i * 3 + 1;
+          int z_idx = i * 3 + 2;
+
+          ROS_INFO("Lantern %d:", i + 1);
+          ROS_INFO("  x: %.2f, y: %.2f, z: %.2f", msg->data[x_idx], msg->data[y_idx], msg->data[z_idx]);
+      }
+    }
+}
+
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "state_machine_node");
@@ -81,6 +133,7 @@ int main(int argc, char** argv) {
   ros::Subscriber lantern_goal_sub = nh.subscribe("/num_lanterns", 1, num_lantern_callback);
 
   ros::Publisher traj_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 10);
+  ros::Subscriber lantern_sub = nh.subscribe("/lantern_positions", 10, updateLanternPositions);
 
   // Define waypoints.
   geometry_msgs::PoseStamped cave_entrance_goal;
@@ -196,6 +249,10 @@ int main(int argc, char** argv) {
                 ROS_INFO("Landing.");
                 current_state = LAND;
                 ROS_INFO("State: LAND");
+                for (size_t i = 0; i < stored_lantern_positions.size(); ++i) {
+                  const auto& lantern = stored_lantern_positions[i];
+                  ROS_INFO("Lantern %zu: x: %.2f, y: %.2f, z: %.2f", i + 1, lantern[0], lantern[1], lantern[2]);
+              }
             }
 
           } break;

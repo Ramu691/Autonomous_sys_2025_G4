@@ -75,6 +75,7 @@ private:
     std::vector<geometry_msgs::Point> known_lantern_positions_;
     int lantern_count_;                // How many unique lanterns so far
     double distance_threshold_;        // to decide if a new detection is "new"
+    std_msgs::Float32MultiArray lantern_positions;
 
 private:
 
@@ -107,7 +108,7 @@ private:
                                 semantic_image, labels, stats, centroids, 8, CV_32S);
 
         // Prepare a numeric array of newly-discovered lantern positions
-        std_msgs::Float32MultiArray lantern_positions;
+        
 
         // label_idx=0 is background
         for (int label_idx = 1; label_idx < num_components; ++label_idx) {
@@ -147,6 +148,7 @@ private:
                 text_msg.data = ss.str();
                 lantern_text_pub_.publish(text_msg);
                 num_lantern_pub_.publish(msg);
+                //lantern_pub_.publish(known_lantern_positions_);               
             }
         }
 

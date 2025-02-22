@@ -126,7 +126,7 @@ public:
         if (node == nullptr)
             return false;
 
-        return node->getOccupancy() <= 0.5;
+        return node->getOccupancy() <= 0.7;
     }
 
     void attemptPlanning()
