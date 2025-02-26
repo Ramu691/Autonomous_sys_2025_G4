@@ -121,9 +121,10 @@
           */
  
          path_sub_ = nh_.subscribe("/rrt_path", 1, &TrajGen::pathCallback, this);
-         traj_pub_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/trajectory", 10);
+         desired_pub_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 10);
          state_sub_ = nh_.subscribe("/stm_mode", 1, &TrajGen::stateCallback, this);
          pose_sub_ = nh_.subscribe("/pose_est", 1, &TrajGen::poseCallback, this);
+
          timer_ = nh_.createTimer(
              ros::Duration(1.0/publish_rate_),
              &TrajGen::timerCallback,
@@ -136,7 +137,7 @@
  private:
      ros::NodeHandle nh_;
      ros::Subscriber path_sub_, state_sub_, pose_sub_;
-     ros::Publisher  traj_pub_;
+     ros::Publisher  desired_pub_;
      ros::Timer      timer_;
      
      geometry_msgs::PoseStamped current_pose_;
@@ -419,7 +420,8 @@
          msg.accelerations[0].linear.y = ay;
          msg.accelerations[0].linear.z = az;
  
-         traj_pub_.publish(msg);
+
+         desired_pub_.publish(msg);
          if (stm_state_=="LAND"){
             ros::shutdown();
          }

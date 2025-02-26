@@ -54,19 +54,12 @@ add_dependencies(traj_gen ${catkin_EXPORTED_TARGETS})
 target_link_libraries(traj_gen ${catkin_LIBRARIES})
 
 
-add_executable(frontier_navigator src/frontier_navigator.cpp)
-add_dependencies(frontier_navigator ${catkin_EXPORTED_TARGETS})
-target_link_libraries(frontier_navigator ${catkin_LIBRARIES})
-
 ## Specify libraries to link a library or executable target against
 target_link_libraries(frontier_detection
   ${catkin_LIBRARIES}
   ${OCTOMAP_LIBRARIES}
 )
-target_link_libraries(frontier_navigator
-  ${catkin_LIBRARIES}
-  ${OCTOMAP_LIBRARIES}
-)
+
 target_link_libraries(traj_gen
   ${catkin_LIBRARIES}
   ${OCTOMAP_LIBRARIES}
