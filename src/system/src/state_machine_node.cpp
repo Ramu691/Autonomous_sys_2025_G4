@@ -156,7 +156,7 @@ int main(int argc, char** argv) {
 
   // Transition parameters.
   double takeoff_altitude = 7.0;
-  double takeoff_threshold = 2.0;
+  double takeoff_threshold = 5.0;
   double frontier_threshold =0.7;
   double cave_threshold = 5.0;  // Increased threshold so the state transitions when within 5 m of the cave entrance.
 
