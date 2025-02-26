@@ -53,7 +53,7 @@ class UAVController{
             if (statemachine_state == "TAKEOFF") {
                 waypoint_index = 0;
             } else if (statemachine_state == "NAVIGATE") {
-                waypoint_index = 1;
+                ros::shutdown();
                 // publishPath();
             } else if (statemachine_state == "EXPLORE") {
                 ros::shutdown();

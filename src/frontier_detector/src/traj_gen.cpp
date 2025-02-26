@@ -16,10 +16,17 @@
  #include <cmath>
  #include <vector>
  #include <std_msgs/String.h>
+ #include <geometry_msgs/PoseStamped.h>
  
  // For converting yaw->quaternion
  #include <tf2/LinearMath/Quaternion.h>
  #include <tf2_geometry_msgs/tf2_geometry_msgs.h> // for toMsg()
+ 
+ // Cave entrance coordinates (from original waypoints)
+ #define CAVE_X -324.0
+ #define CAVE_Y 10.0
+ #define CAVE_Z 16.0
+ #define CAVE_YAW 3.14
  
  /**
   * @brief Compute the total Euclidean distance along a path.
@@ -115,7 +122,8 @@
  
          path_sub_ = nh_.subscribe("/rrt_path", 1, &TrajGen::pathCallback, this);
          traj_pub_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/trajectory", 10);
-         state_subscriber_ = nh_.subscribe("/stm_mode", 1, &TrajGen::onStateStm, this);
+         state_sub_ = nh_.subscribe("/stm_mode", 1, &TrajGen::stateCallback, this);
+         pose_sub_ = nh_.subscribe("/pose_est", 1, &TrajGen::poseCallback, this);
          timer_ = nh_.createTimer(
              ros::Duration(1.0/publish_rate_),
              &TrajGen::timerCallback,
@@ -127,38 +135,77 @@
  
  private:
      ros::NodeHandle nh_;
-     ros::Subscriber path_sub_, state_subscriber_;
+     ros::Subscriber path_sub_, state_sub_, pose_sub_;
      ros::Publisher  traj_pub_;
      ros::Timer      timer_;
-     std::string stm_state_ ;
-
+     
+     geometry_msgs::PoseStamped current_pose_;
+     std::string stm_state_;
+     bool pose_received_ = false;
  
+     // Original trajectory variables
      double publish_rate_;
- 
-     // Piecewise polynomial data (for each segment, one cubic per dimension)
      std::vector<Eigen::VectorXd> cxs_, cys_, czs_;
      std::vector<double> segTimes_;
      std::vector<double> cumTimes_;
      double total_time_;
      ros::Time start_time_;
      bool has_coeffs_;
- 
-     // For comparing old vs. new path (conditional switching)
      double old_path_distance_;
      double distance_margin_factor_;
  
+     void poseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
+         current_pose_ = *msg;
+         pose_received_ = true;
+     }
+ 
+     void stateCallback(const std_msgs::String& msg) {
+         stm_state_ = msg.data;
+         
+         // Handle state transitions
+         if (stm_state_ == "NAVIGATE" && pose_received_) {
+             generateCaveEntrancePath();
+         }
+
+     }
+ 
+     void generateCaveEntrancePath() {
+         nav_msgs::Path path;
+         path.header.stamp = ros::Time::now();
+         path.header.frame_id = "world";
+ 
+         // Start from current position
+         geometry_msgs::PoseStamped start;
+         start.pose = current_pose_.pose;
+         path.poses.push_back(start);
+ 
+         // Add cave entrance waypoint
+         geometry_msgs::PoseStamped cave;
+         cave.pose.position.x = CAVE_X;
+         cave.pose.position.y = CAVE_Y;
+         cave.pose.position.z = CAVE_Z;
+         tf2::Quaternion q;
+         q.setRPY(0, 0, CAVE_YAW);
+         cave.pose.orientation = tf2::toMsg(q);
+         path.poses.push_back(cave);
+ 
+         // Trigger path processing
+         pathCallback(path);
+         ROS_INFO("Generated cave entrance path");
+     }
      /**
       * @brief Callback for new /rrt_path messages.
       *        Conditionally switch to the new path if it is significantly better.
       */
      void pathCallback(const nav_msgs::Path &path_msg)
      {
-         size_t N = path_msg.poses.size();
+
+            size_t N = path_msg.poses.size();
          if (N < 2) {
              ROS_WARN("TrajGen: /rrt_path has <2 poses, ignoring.");
              return;
          }
- 
+         
          double new_path_dist = computePathDistance(path_msg);
  
          if (!has_coeffs_) {
@@ -189,9 +236,10 @@
              ROS_INFO("TrajGen: Mid-flight ignoring new path (new=%.1f not better than remaining=%.1f).",
                       new_path_dist, old_path_dist_remaining);
          }
-     }
-     void onStateStm(const std_msgs::String& cur_state){
-      stm_state_ = cur_state.data;
+
+        
+        
+         
      }
  
      /**
@@ -378,7 +426,7 @@
  
          ROS_INFO_THROTTLE(1.0,
              "TrajGen: seg=%lu t=%.2f/%.2f -> pos(%.2f, %.2f, %.2f) vel(%.2f, %.2f, %.2f) yaw=%.1f deg",
-             seg_idx, t_in_segment, Tseg, px, py, pz, vx, vy, vz, heading * 180.0 / M_PI
+             seg_idx, t_in_segment, Tseg, px, py, pz, vx, vy, vz, heading 
          );
      }
  };
