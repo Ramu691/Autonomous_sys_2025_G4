@@ -69,11 +69,12 @@ public:
 		if (!ros::param::get("occ_neighbor_threshold", occ_neighbor_threshold)) ROS_FATAL("Required parameter occ_neighbor_threshold was not found on parameter server");
 
         octomap_subscriber = nh.subscribe("/octomap_binary", 1, &FrontierDetector::parseOctomap, this);
-	timer = nh.createTimer(ros::Duration(1.0/publish_goal_frequency), &FrontierDetector::publish_goal,this);     
+		timer = nh.createTimer(ros::Duration(1.0/publish_goal_frequency), &FrontierDetector::publish_goal,this);   
+		frontier_publisher = nh.advertise<visualization_msgs::MarkerArray>("/frontiers", 1);
         Curr_Pose_Subscriber = nh.subscribe("/pose_est",1,&FrontierDetector::Current_position,this);       
         frontier_goal_publisher = nh.advertise<custom_msgs::FrontierGoalMsg>("/frontier_goal", 1);
         state_subscriber = nh.subscribe("/stm_mode", 1, &FrontierDetector::onStateStm, this);
-	check_path_client = nh.serviceClient<custom_msgs::CheckPath>("check_path");
+		check_path_client = nh.serviceClient<custom_msgs::CheckPath>("check_path");
         
         // cave entry coordinates
 		cave_entry_point.x = -321.0;
