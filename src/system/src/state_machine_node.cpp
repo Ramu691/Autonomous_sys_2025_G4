@@ -52,8 +52,7 @@ void frontierGoalCallback(const custom_msgs::FrontierGoalMsg::ConstPtr& msg) {
   latest_frontier_point.x = msg->point.x;
   latest_frontier_point.y = msg->point.y;
   latest_frontier_point.z = msg->point.z;
-  // ROS_INFO("Frontier goal received: x=%f, y=%f, z=%f",
-  //         msg->point.x, msg->point.y, msg->point.z);
+  
 }
 
 // Function to store the lantern positions for further use
@@ -82,13 +81,6 @@ void updateLanternPositions(const std_msgs::Float32MultiArray::ConstPtr& msg) {
     }
 }
 
-// void num_lantern_callback(const std_msgs::String::ConstPtr& num) {
-//     try {
-//         num_of_lantern = std::stoi(num->data);
-//     } catch (const std::exception& e) {
-//         ROS_ERROR("Failed to convert num_lantern string to int: %s", e.what());
-//     }
-// }
 void num_lantern_callback(const std_msgs::Int16::ConstPtr& msg) {
         num_of_lantern.data = msg->data;  
         //ROS_INFO("Received number of lanterns: %d", num_of_lantern.data);       
@@ -123,17 +115,18 @@ int main(int argc, char** argv) {
   ros::NodeHandle nh;
   num_of_lantern.data=0;
   
-  //ros::Publisher desired_state_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 1, true);
+  // Publishers.
   ros::Publisher stm_mode_pub = nh.advertise<std_msgs::String>("/stm_mode", 10);
+  ros::Publisher traj_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 10);
 
   // Subscribers.
   ros::Subscriber current_state_sub = nh.subscribe("/current_state_est", 10, currentStateCallback);
-  // Subscribe to frontier goal from the frontier detector.
   ros::Subscriber frontier_goal_sub = nh.subscribe("/frontier_goal", 1, frontierGoalCallback);
   ros::Subscriber lantern_goal_sub = nh.subscribe("/num_lanterns", 1, num_lantern_callback);
-
-  ros::Publisher traj_pub = nh.advertise<trajectory_msgs::MultiDOFJointTrajectoryPoint>("/desired_state", 10);
   ros::Subscriber lantern_sub = nh.subscribe("/lantern_positions", 10, updateLanternPositions);
+  
+  
+  
 
   // Define waypoints.
   geometry_msgs::PoseStamped cave_entrance_goal;
@@ -220,17 +213,6 @@ int main(int argc, char** argv) {
             mode_msg.data = "EXPLORE";
             stm_mode_pub.publish(mode_msg);
             
-            // //   ROS_INFO("Landing.");
-            // //   current_state = LAND;
-            // }
-            // //else if(!frontier_goal_received && tot_num_lanters_detected==5){
-            // if (!frontier_goal_received && num_of_lantern.data == 5) {
-            //ros::Time current_time = ros::Time::now();  // Get the current time
-            // if ((current_time - last_reset_time).toSec() >= RESET_INTERVAL) {
-            //     frontier_check_counter = 0;
-            //     last_reset_time = current_time;  // Update reset time
-            //     ROS_INFO("Counter reset after 5 seconds.");
-            // }
             if(sqrt(pow(current_pose.pose.position.x - latest_frontier_point.x, 2) + 
                     pow(current_pose.pose.position.y - latest_frontier_point.y, 2) + 
                     pow(current_pose.pose.position.z - latest_frontier_point.z, 2)) <= frontier_threshold ){
@@ -244,7 +226,6 @@ int main(int argc, char** argv) {
                       
                     }
             
-            // if (!frontier_goal_received && num_of_lantern.data == 5 ) {
             if (!frontier_goal_received && num_of_lantern.data == 5 ) {
                 ROS_INFO("Landing.");
                 current_state = LAND;
@@ -290,9 +271,9 @@ int main(int argc, char** argv) {
             land_traj.accelerations[0].angular.z = 0;
             
             traj_pub.publish(land_traj);     
-            // ros::shutdown();
+            
           } break;
-          // ros::shutdown();
+          
       } // end switch
       last_transition_time = ros::Time::now();
     } // end if
