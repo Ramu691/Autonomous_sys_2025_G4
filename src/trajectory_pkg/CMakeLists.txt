@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(frontier_detector)
+project(trajectory_pkg)
 set (CMAKE_CXX_STANDARD 11)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
@@ -45,14 +45,16 @@ include_directories(
 
 link_libraries(${OCTOMAP_LIBRARIES})
 
-add_executable(frontier_detection src/frontier_detection.cpp)
-add_dependencies(frontier_detection ${catkin_EXPORTED_TARGETS})
-target_link_libraries(frontier_detection ${catkin_LIBRARIES})
+add_executable(traj_gen src/traj_gen.cpp)
+add_dependencies(traj_gen ${catkin_EXPORTED_TARGETS})
+target_link_libraries(traj_gen ${catkin_LIBRARIES})
 
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(frontier_detection
+
+target_link_libraries(traj_gen
   ${catkin_LIBRARIES}
   ${OCTOMAP_LIBRARIES}
 )
+
 

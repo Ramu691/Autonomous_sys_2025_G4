@@ -1,5 +1,4 @@
 <launch>
    <rosparam command="load" file="$(find frontier_detector)/params/frontier_detector.yaml" />
    <node pkg="frontier_detector" type="frontier_detection" name="frontier_detector"/>
-   <node pkg="frontier_detector" type="traj_gen" name="traj_gen"/>
 </launch>

@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <package>
-  <name>move_pkg</name>
+  <name>detection_pkg</name>
   <version>0.0.0</version>
   <description>A package for controlling the drone and detecting lanterns</description>
-  <maintainer email="youremail@example.com">Your Name</maintainer>
+  <maintainer email="mohamad.alattar@tum.de">Mohamad Alattar</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>catkin</buildtool_depend>

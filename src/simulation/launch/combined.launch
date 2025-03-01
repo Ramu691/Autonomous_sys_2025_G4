@@ -4,8 +4,10 @@
   <include file="$(find controller_pkg)/launch/controller_pkg.launch" />
   <include file="$(find perception_pkg)/launch/perception.launch" />
   <include file="$(find frontier_detector)/launch/frontier_detector.launch" />
+
   <include file="$(find rrt_planner)/launch/rrt_planner.launch" />
-  <node pkg="move_pkg" type="lantern_detector" name="move_pkg"/>  
+  <node pkg="detection_pkg" type="lantern_detector" name="detection_pkg"/>  
+  <node pkg="trajectory_pkg" type="traj_gen" name="trajectory_pkg"/>  
   <include file="$(find system)/launch/state_machine.launch" />
   <!-- Comment in the following line to show visualization in rviz -->
   <!-- Make sure to install the following plugin before: "sudo apt-get install ros-noetic-octomap-rviz-plugins" -->

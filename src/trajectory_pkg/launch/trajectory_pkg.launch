@@ -1,0 +1,4 @@
+<launch>
+   <rosparam command="load" file="$(find trajectory_pkg)/params/trajectory_pkg.yaml" />
+   <node pkg="trajectory_pkg" type="traj_gen" name="trajectory_pkg"/>
+</launch>
